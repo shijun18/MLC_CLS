@@ -2,7 +2,19 @@
 __pycache__/
 *.py[cod]
 *$py.class
-
+.ipynb_checkpoints/
+dataset/
+txt_recorder/
+log/
+ckpt/
+.vscode/
+__pycache__/
+mid_feature/
+rename.py
+*.ipynb
+remove.py
+*.csv
+*.json
 # C extensions
 *.so
 
