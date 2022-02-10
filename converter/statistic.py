@@ -124,16 +124,11 @@ def voice_time(input_path,save_path):
     
 
 if __name__ == '__main__':
-    # input_path = '/staff/shijun/torch_projects/XunFei_Classifier/dataset/Adver_Material/train'
-    # save_path = './adver_material_count.csv'
-    # sample_count(input_path,save_path)
-    # input_path = '/staff/shijun/torch_projects/XunFei_Classifier/dataset/Adver_Material/train'
-    # save_path = './adver_material_size.csv'
-    # size_count(input_path,save_path)
-    # input_path = '/staff/shijun/torch_projects/XunFei_Classifier/dataset/Leve_Disease/train'
-    # cal_mean_std(input_path)
 
-    input_csv = './csv_file/MLC.csv'
+    input_csv = './csv_file/MLC_gamma1mm.csv'
     path_list = pd.read_csv(input_csv)['id'].values.tolist()
-    cal_mean_std(path_list)
-    # cal_mean_std_single(path_list)
+    test_input_csv = './csv_file/MLC_gamma1mm_test.csv'
+    test_path_list = pd.read_csv(test_input_csv)['id'].values.tolist()
+    path_list += test_path_list
+    # cal_mean_std(path_list)
+    cal_mean_std_single(path_list)

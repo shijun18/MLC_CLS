@@ -10,14 +10,15 @@ def gen_data(img_path,save_path):
 	gamma1_path = os.path.join(img_path,dir_name[1])
 	gamma2_path = os.path.join(img_path,dir_name[2])
 	dose_name = os.listdir(dose_path)
-	dose_name.sort(key=lambda x:x[:12])
+	dose_name.sort(key=lambda x:x[:-13])
 	gamma1_name = os.listdir(gamma1_path)
-	gamma1_name.sort(key=lambda x:x[:12])
+	gamma1_name.sort(key=lambda x:x[:-14])
 	gamma2_name = os.listdir(gamma2_path)
-	gamma2_name.sort(key=lambda x:x[:12])
+	gamma2_name.sort(key=lambda x:x[:-14])
 	for dose_img,gamma1_img,gamma2_img in zip(dose_name,gamma1_name,gamma2_name):
 		print(dose_img,gamma1_img,gamma2_img)
-		assert dose_img[:12] == gamma1_img[:12] == gamma2_img[:12]
+		# assert dose_img[:12] == gamma1_img[:12] == gamma2_img[:12]
+		assert dose_img[:-13] == gamma1_img[:-14] == gamma2_img[:-14]
 		dose_item = os.path.join(dose_path,dose_img)
 		dose_img_r = Image.open(dose_item).convert('L')
 		gamma1_item = os.path.join(gamma1_path,gamma1_img)
@@ -27,14 +28,17 @@ def gen_data(img_path,save_path):
 		rgb_img = np.stack([np.array(dose_img_r),np.array(gamma1_img_g),np.array(gamma2_img_b)],axis=-1)
 		print(rgb_img.shape)
 		rgb_img = Image.fromarray(rgb_img, mode='RGB')
-		rgb_img_path = os.path.join(save_path,dose_img[:12] + '.png')
+		rgb_img_path = os.path.join(save_path,dose_img[:-13] + '.png')
 		rgb_img.save(rgb_img_path)
 
 if __name__ == '__main__':
-	root_path = '../dataset/raw_data'
-	train_path = '../dataset/MLC/train'
+	# root_path = '../dataset/raw_data/train'
+	# train_path = '../dataset/MLC/train'
+	root_path = '../dataset/raw_data/test'
+	test_path = '../dataset/MLC/test'
 	for dose_path in os.scandir(root_path):
-		save_path = os.path.join(train_path,dose_path.name)
+		# save_path = os.path.join(train_path,dose_path.name)
+		save_path = os.path.join(test_path,dose_path.name)
 		if not os.path.exists(save_path):
 			os.makedirs(save_path)
 		gen_data(dose_path.path,save_path)

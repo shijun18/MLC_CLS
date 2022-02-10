@@ -2,7 +2,7 @@
 __all__ = ['resnet18','resnet34', 'resnet50','resnest18','resnest50',\
             'efficientnet-b5','efficientnet-b7','efficientnet-b3','efficientnet-b8','densenet121',\
             'densenet169','regnetx-200MF','regnetx-600MF','regnety-600MF','regnety-4.0GF',\
-            'res2net50','res2net18','res2next50', 'simplenet','simplenetv2',\
+            'regnety-8.0GF','regnety-16GF','res2next50', 'simplenet','simplenetv2',\
             'simplenetv3','simplenetv4','simplenetv5','simplenetv6','simplenetv7',\
             'simplenetv8','simplenetv9','simplenetv10','res2next18','se_resnet18', 'se_resnet10',\
             'bilinearnet_b5','finenet50','directnet50']
@@ -10,17 +10,23 @@ __all__ = ['resnet18','resnet34', 'resnet50','resnest18','resnest50',\
 
 
 data_config = {
-    'MLC':'./converter/csv_file/MLC.csv'
+    'MLC':'./converter/csv_file/MLC.csv',
+    'MLC_Dose':'./converter/csv_file/MLC_dose.csv',
+    'MLC_Gamma1mm':'./converter/csv_file/MLC_gamma1mm.csv',
+    'MLC_Gamma2mm':'./converter/csv_file/MLC_gamma2mm.csv',
 }
 
 num_classes = {
     'MLC':5,
+    'MLC_Dose':5,
+    'MLC_Gamma1mm':5,
+    'MLC_Gamma2mm':5
 }
 
 TASK = 'MLC'
 NET_NAME = 'efficientnet-b5' #regnetx-200MF
-VERSION = 'v6.0-pretrained' #v12.0-pretrained-mod-1-023
-DEVICE = '2'
+VERSION = 'v6.0-pretrained-x1' 
+DEVICE = '0,1'
 # Must be True when pre-training and inference
 PRE_TRAINED = False	
 # 1,2,3,4
@@ -48,32 +54,53 @@ else:
 # WEIGHT_PATH_LIST = None
 
 MEAN = {
-    'MLC':[0.495, 0.481, 0.485]
+    'MLC':[0.499, 0.492, 0.493],
+    'MLC_Dose':[0.499],
+    'MLC_Gamma1mm':[0.492],
+    'MLC_Gamma2mm':[0.493]
 }
 
 STD = {
-    'MLC':[0.088, 0.191, 0.154]
+    'MLC':[0.065, 0.152, 0.118],
+    'MLC_Dose':[0.065],
+    'MLC_Gamma1mm':[0.152],
+    'MLC_Gamma2mm':[0.118]
 }
 
 MILESTONES = {
-    'MLC':[30,60,90]
+    'MLC':[30,60,90],
+    'MLC_Dose':[30,60,90],
+    'MLC_Gamma1mm':[30,60,90],
+    'MLC_Gamma2mm':[30,60,90]
 }
 
 EPOCH = {
-    'MLC':150
+    'MLC':150,
+    'MLC_Dose':150,
+    'MLC_Gamma1mm':150,
+    'MLC_Gamma2mm':150
 }
 
 TRANSFORM = {
-    'MLC':[2,3,4,6,7,8,9,10,19]
+    'MLC':[2,3,4,6,7,8,9,10,19],
+    'MLC_Dose':[2,3,4,6,7,8,9,10,19],
+    'MLC_Gamma1mm':[2,3,4,6,7,8,9,10,19],
+    'MLC_Gamma2mm':[2,3,4,6,7,8,9,10,19]
 }
 
 SHAPE = {
-    'MLC':(128, 128)
+    'MLC':(128, 128),
+    'MLC_Dose':(128, 128),
+    'MLC_Gamma1mm':(128, 128),
+    'MLC_Gamma2mm':(128, 128)
 }
 
 
 CHANNEL = {
-    'MLC':3
+    'MLC':3,
+    'MLC_Dose':1,
+    'MLC_Gamma1mm':1,
+    'MLC_Gamma2mm':1
 }
 
 # Arguments when trainer initial
@@ -106,15 +133,6 @@ INIT_TRAINER = {
     'mix_only': True if 'only' in VERSION else False
 }
 
-# no_crop     
-
-# mean:0.131
-# std:0.209
-
-#crop
-# mean:0.189
-# std:0.185
-
 
 # Arguments when perform the trainer
 __loss__ = ['Cross_Entropy','TopkCrossEntropy','SoftCrossEntropy','F1_Loss','TopkSoftCrossEntropy','DynamicTopkCrossEntropy','DynamicTopkSoftCrossEntropy']
@@ -122,12 +140,18 @@ LOSS_FUN = 'Cross_Entropy'
 # Arguments when perform the trainer
 
 CLASS_WEIGHT = {
-    'MLC':None
+    'MLC':None,
+    'MLC_Dose':None,
+    'MLC_Gamma1mm':None,
+    'MLC_Gamma2mm':None
 }
 
 
 MONITOR = {
-    'MLC':'val_acc'
+    'MLC':'val_acc',
+    'MLC_Dose':'val_acc',
+    'MLC_Gamma1mm':'val_acc',
+    'MLC_Gamma2mm':'val_acc'
 }
 
 SETUP_TRAINER = {
@@ -139,5 +163,5 @@ SETUP_TRAINER = {
     'lr_scheduler': 'CosineAnnealingWarmRestarts', #'MultiStepLR','CosineAnnealingWarmRestarts' for fine-tune and warmup
     'balance_sample':True if 'balance' in VERSION else False,#False
     'monitor':MONITOR[TASK],
-    'repeat_factor':4.0
+    'repeat_factor':1.0
 }

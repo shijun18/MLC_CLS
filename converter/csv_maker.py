@@ -12,14 +12,17 @@ INDEX = {
     'Contract_png':4
 }
 
-def make_label_csv(input_path,csv_path):
+def make_label_csv(input_path,csv_path,mid_dir=None):
 
     info = []
     for subdir in os.scandir(input_path):
-        # if subdir.name == '1':
-        #     continue
         index = INDEX[subdir.name]
-        path_list = glob.glob(os.path.join(subdir.path,"*.*g"))
+        if mid_dir is None:
+            path_list = glob.glob(os.path.join(subdir.path,"*.*g"))
+        else:
+            mid_path = os.path.join(subdir.path,mid_dir)
+            # print(mid_path)
+            path_list = glob.glob(os.path.join(mid_path,"*.*g"))
         sub_info = [[item,index] for item in path_list]
         info.extend(sub_info)
     
@@ -44,6 +47,14 @@ def make_csv(input_path,csv_path):
 if __name__ == "__main__":
   
 
-    input_path = '/staff/shijun/torch_projects/MLC_CLS/dataset/MLC/train'
-    csv_path = './csv_file/MLC.csv'
-    make_label_csv(input_path,csv_path)
+    # input_path = '/staff/shijun/torch_projects/MLC_CLS/dataset/MLC/train'
+    # csv_path = './csv_file/MLC.csv'
+    # input_path = '/staff/shijun/torch_projects/MLC_CLS/dataset/MLC/test'
+    # csv_path = './csv_file/MLC_test.csv'
+    # make_label_csv(input_path,csv_path)
+
+    input_path = '/staff/shijun/torch_projects/MLC_CLS/dataset/raw_data/train'
+    csv_path = './csv_file/MLC_gamma2mm.csv'
+    # input_path = '/staff/shijun/torch_projects/MLC_CLS/dataset/raw_data/test'
+    # csv_path = './csv_file/MLC_gamma2mm_test.csv'
+    make_label_csv(input_path,csv_path,mid_dir='gamma2mm')

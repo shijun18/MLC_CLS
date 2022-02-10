@@ -5,7 +5,7 @@ import pandas as pd
 from data_utils.csv_reader import csv_reader_single
 from config import INIT_TRAINER, SETUP_TRAINER,TASK,NUM_CLASSES
 from config import VERSION, CURRENT_FOLD, FOLD_NUM, WEIGHT_PATH_LIST, TTA_TIMES, CSV_PATH
-
+from sklearn.metrics import classification_report
 import time
 import numpy as np
 import random
@@ -18,7 +18,20 @@ ADD_FACTOR = {
     'MLC':0
 }
 
+target_names  = [
+    'Shift_png',
+    'Random_png',
+    'Original_png',
+    'Expand_png',
+    'Contract_png'
+]
 
+TEST_DATA = {
+    'MLC':'./converter/csv_file/MLC_test.csv',
+    'MLC_Dose':'./converter/csv_file/MLC_dose_test.csv',
+    'MLC_Gamma1mm':'./converter/csv_file/MLC_gamma1mm_test.csv',
+    'MLC_Gamma2mm':'./converter/csv_file/MLC_gamma2mm_test.csv',
+}
 
 def get_cross_validation_balance(path_list, fold_num, current_fold):
     assert len(path_list) == 2
@@ -174,14 +187,18 @@ if __name__ == "__main__":
     elif 'inf' in args.mode:
         add_factor = ADD_FACTOR[TASK]
         save_dir = './analysis/result/{}/{}'.format(TASK,VERSION)
+        test_csv = TEST_DATA[TASK]
+        df = pd.read_csv(test_csv)
+        test_path = df['id'].values.tolist()
+        true_result = df['label'].values.tolist()
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
         if args.mode == 'inf' or args.mode == 'inf-tta':
-            test_id = os.listdir(args.path)
+            # test_id = os.listdir(args.path)
             # test_id.sort(key=lambda x:eval(x.split('.')[0].split('_')[-1]))
-            test_id.sort(key=lambda x:x.split('.')[0])
-            test_path = [os.path.join(args.path, case)
-                        for case in test_id]
+            # test_id.sort(key=lambda x:x.split('.')[0])
+            # test_path = [os.path.join(args.path, case)
+            #             for case in test_id]
             
             save_path = os.path.join(save_dir,f'submission_fold{CURRENT_FOLD}.csv')
 
@@ -198,7 +215,10 @@ if __name__ == "__main__":
             info[KEY[TASK][1]] = [int(case) + add_factor for case in result['pred']]
             for i in range(NUM_CLASSES):
                 info[f'prob_{str(i+1)}'] = np.array(result['prob'])[:,i].tolist()
-
+            
+            #metric
+            pred_result = [int(case) + add_factor for case in result['pred']]
+            print(classification_report(true_result, pred_result, target_names=target_names))
             # info['prob'] = result['prob']
             csv_file = pd.DataFrame(info)
             csv_file.to_csv(save_path, index=False)
@@ -207,11 +227,11 @@ if __name__ == "__main__":
         # Inference with cross validation
         ###############################################
         elif args.mode == 'inf-cross':
-            test_id = os.listdir(args.path)
+            # test_id = os.listdir(args.path)
             # test_id.sort(key=lambda x:eval(x.split('.')[0].split('_')[-1]))
-            test_id.sort(key=lambda x:x.split('.')[0])
-            test_path = [os.path.join(args.path, case)
-                        for case in test_id]
+            # test_id.sort(key=lambda x:x.split('.')[0])
+            # test_path = [os.path.join(args.path, case)
+            #             for case in test_id]
             
             save_path_vote = os.path.join(save_dir,'submission_vote.csv')
             save_path = os.path.join(save_dir,'submission_ave.csv')
@@ -253,6 +273,11 @@ if __name__ == "__main__":
             for i in range(NUM_CLASSES):
                 info[f'prob_{str(i+1)}'] = np.array(result['prob'])[:,i].tolist()
             # info['prob'] = result['prob']
+            
+            #metric
+            pred_result = [int(case) + add_factor for case in result['pred']]
+            print(classification_report(true_result, pred_result, target_names=target_names))
+            
             csv_file = pd.DataFrame(info)
             csv_file.to_csv(save_path, index=False)
 
@@ -263,6 +288,11 @@ if __name__ == "__main__":
             for i in range(NUM_CLASSES):
                 info[f'prob_{str(i+1)}'] = np.array(result['prob'])[:,i].tolist()
             # info['prob'] = result['prob']
+
+            #metric
+            pred_result = [int(case) + add_factor for case in result['vote_pred']]
+            print(classification_report(true_result, pred_result, target_names=target_names))
+
             csv_file = pd.DataFrame(info)
             csv_file.to_csv(save_path_vote, index=False)
         ###############################################
