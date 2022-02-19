@@ -2,7 +2,7 @@ import os
 import argparse
 from trainer import My_Classifier
 import pandas as pd
-from data_utils.csv_reader import csv_reader_single
+from utils import csv_reader_single
 from config import INIT_TRAINER, SETUP_TRAINER,TASK,NUM_CLASSES
 from config import VERSION, CURRENT_FOLD, FOLD_NUM, WEIGHT_PATH_LIST, TTA_TIMES, CSV_PATH
 from sklearn.metrics import classification_report
@@ -11,11 +11,17 @@ import numpy as np
 import random
 
 KEY = {
-    'MLC':['image_id','category_id']
+    'MLC':['image_id','category_id'],
+    'MLC_Dose':['image_id','category_id'],
+    'MLC_Gamma1mm':['image_id','category_id'],
+    'MLC_Gamma2mm':['image_id','category_id']
 }
 
 ADD_FACTOR = {
-    'MLC':0
+    'MLC':0,
+    'MLC_Dose':0,
+    'MLC_Gamma1mm':0,
+    'MLC_Gamma2mm':0
 }
 
 target_names  = [

@@ -1,3 +1,11 @@
+'''
+/*
+ * @Author: Jun Shi 
+ * @Date: 2022-02-19 20:05:32 
+ * @Last Modified by:   Jun Shi 
+ * @Last Modified time: 2022-02-19 20:05:32 
+ */
+'''
 import sys
 import os,shutil
 from tqdm import tqdm
@@ -72,6 +80,7 @@ class My_Classifier(object):
         # save the middle output
         self.feature_in = []
         self.feature_out = []
+        
         self.weight_decay = weight_decay
         self.momentum = momentum
         self.mean = mean
@@ -101,9 +110,8 @@ class My_Classifier(object):
             tr.Resize(size=self.input_shape), #2
             tr.RandomAffine(0,(0.1,0.1),(0.8,1.2)), #3
             tr.ColorJitter(brightness=.3,contrast=.3), #4
-            tr.RandomPerspective(distortion_scale=0.6, p=0.5), #5
-            RandomRotate([-30, -45, -90, 0, 90, 45, 30]), #6 45/60  
-            # tr.RandomRotation((-15,+15)), #6
+            tr.RandomPerspective(distortion_scale=0.6, p=0.5), #5 
+            tr.RandomRotation((-15,+15)), #6
             tr.RandomHorizontalFlip(p=0.5), #7
             tr.RandomVerticalFlip(p=0.5), #8
             tr.ToTensor(), #9
@@ -251,8 +259,7 @@ class My_Classifier(object):
                 saver = {
                     'epoch': epoch,
                     'save_dir': output_dir,
-                    'state_dict': state_dict,
-                    'optimizer': optimizer.state_dict()
+                    'state_dict': state_dict
                 }
 
                 file_name = 'epoch={}-train_loss={:.5f}-val_loss={:.5f}-train_acc={:.5f}-val_acc={:.5f}-val_f1={:.5f}.pth'.format(
@@ -647,18 +654,6 @@ class My_Classifier(object):
             
             if 'maxpool' in net_name:
                 net.head.avg_pool = nn.AdaptiveMaxPool2d(1)
-
-        elif 'directnet' in net_name:
-            import model.directnet as directnet
-            net = directnet.__dict__[net_name](in_channels=self.channels,num_classes=self.num_classes)
-        
-        elif 'finenet' in net_name:
-            import model.finenet as finenet
-            net = finenet.__dict__[net_name](input_channels=self.channels,num_classes=self.num_classes)
-
-        elif net_name.startswith('bilinearnet'):
-            import model.bilinearnet as bilinearnet
-            net = bilinearnet.__dict__[net_name](input_channels=self.channels,num_classes=self.num_classes)
 
         return net
 

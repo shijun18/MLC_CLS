@@ -4,8 +4,7 @@ __all__ = ['resnet18','resnet34', 'resnet50','resnest18','resnest50',\
             'densenet169','regnetx-200MF','regnetx-600MF','regnety-600MF','regnety-4.0GF',\
             'regnety-8.0GF','regnety-16GF','res2next50', 'simplenet','simplenetv2',\
             'simplenetv3','simplenetv4','simplenetv5','simplenetv6','simplenetv7',\
-            'simplenetv8','simplenetv9','simplenetv10','res2next18','se_resnet18', 'se_resnet10',\
-            'bilinearnet_b5','finenet50','directnet50']
+            'simplenetv8','simplenetv9','simplenetv10','res2next18','se_resnet18', 'se_resnet10']
 
 
 
@@ -23,14 +22,14 @@ num_classes = {
     'MLC_Gamma2mm':5
 }
 
-TASK = 'MLC'
+TASK = 'MLC_Gamma2mm'
 NET_NAME = 'efficientnet-b5' #regnetx-200MF
 VERSION = 'v6.0-pretrained-x1' 
-DEVICE = '0,1'
+DEVICE = '2'
 # Must be True when pre-training and inference
 PRE_TRAINED = False	
 # 1,2,3,4
-CURRENT_FOLD = 5
+CURRENT_FOLD = 3
 GPU_NUM = len(DEVICE.split(','))
 FOLD_NUM = 5
 TTA_TIMES = 11
@@ -82,10 +81,10 @@ EPOCH = {
 }
 
 TRANSFORM = {
-    'MLC':[2,3,4,6,7,8,9,10,19],
-    'MLC_Dose':[2,3,4,6,7,8,9,10,19],
-    'MLC_Gamma1mm':[2,3,4,6,7,8,9,10,19],
-    'MLC_Gamma2mm':[2,3,4,6,7,8,9,10,19]
+    'MLC':[2,3,4,6,7,8,9,19],
+    'MLC_Dose':[2,3,4,6,7,8,9,19],
+    'MLC_Gamma1mm':[2,3,4,6,7,8,9,19],
+    'MLC_Gamma2mm':[2,3,4,6,7,8,9,19]
 }
 
 SHAPE = {
