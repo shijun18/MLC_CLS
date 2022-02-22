@@ -105,6 +105,8 @@ if __name__ == "__main__":
                         help='choose the mode', type=str)
     parser.add_argument('-s', '--save', default='no', choices=['no', 'n', 'yes', 'y'],
                         help='save the forward middle features or not', type=str)
+    parser.add_argument('-c', '--csv', default='no', choices=['no', 'n', 'yes', 'y'],
+                        help='save the result as csv or not', type=str)
     parser.add_argument('-p', '--path', default='/staff/shijun/torch_projects/XunFei_Classifier/dataset',
                         help='the directory path of input image', type=str)
     args = parser.parse_args()
@@ -227,22 +229,25 @@ if __name__ == "__main__":
             cls_report = classification_report(
                 true_result, 
                 pred_result, 
-                output_dict=True, 
+                output_dict=True if args.csv == 'yes' or args.csv == 'y' else False, 
                 target_names=target_names
             )
-            specificity = compute_specificity(np.array(true_result),np.array(pred_result),classes=set(range(NUM_CLASSES)))
+            if args.csv == 'yes' or args.csv == 'y':
+                specificity = compute_specificity(np.array(true_result),np.array(pred_result),classes=set(range(NUM_CLASSES)))
+                
+                for i,target in enumerate(target_names):
+                    cls_report[target]['specificity'] = specificity[i]
+                cls_report['macro avg']['specificity'] = np.mean(specificity)
+                #save as csv
+                report_save_path = os.path.join(save_dir,f'fold{str(CURRENT_FOLD)}_report.csv')
+                report_csv_file = pd.DataFrame(cls_report)
+                report_csv_file.to_csv(report_save_path)
             
-            for i,target in enumerate(target_names):
-                cls_report[target]['specificity'] = specificity[i]
-            cls_report['macro avg']['specificity'] = np.mean(specificity)
             print(cls_report)
             # info['prob'] = result['prob']
             csv_file = pd.DataFrame(info)
             csv_file.to_csv(save_path, index=False)
-            #save as csv
-            report_save_path = os.path.join(save_dir,f'fold{str(CURRENT_FOLD)}_report.csv')
-            report_csv_file = pd.DataFrame(cls_report)
-            report_csv_file.to_csv(report_save_path)
+            
         ###############################################
 
         # Inference with cross validation
@@ -299,21 +304,24 @@ if __name__ == "__main__":
             cls_report = classification_report(
                 true_result, 
                 pred_result, 
-                output_dict=True, 
+                output_dict=True if args.csv == 'yes' or args.csv == 'y' else False, 
                 target_names=target_names
             )
-            specificity = compute_specificity(np.array(true_result),np.array(pred_result),classes=set(range(NUM_CLASSES)))
-            for i,target in enumerate(target_names):
-                cls_report[target]['specificity'] = specificity[i]
-            cls_report['macro avg']['specificity'] = np.mean(specificity)
+            if args.csv == 'yes' or args.csv == 'y':
+                specificity = compute_specificity(np.array(true_result),np.array(pred_result),classes=set(range(NUM_CLASSES)))
+                for i,target in enumerate(target_names):
+                    cls_report[target]['specificity'] = specificity[i]
+                cls_report['macro avg']['specificity'] = np.mean(specificity)
+                #save as csv
+                report_save_path = os.path.join(save_dir,f'cross_report.csv')
+                report_csv_file = pd.DataFrame(cls_report)
+                report_csv_file.to_csv(report_save_path)
+
             print(cls_report)
             
             csv_file = pd.DataFrame(info)
             csv_file.to_csv(save_path, index=False)
-            #save as csv
-            report_save_path = os.path.join(save_dir,f'cross_report.csv')
-            report_csv_file = pd.DataFrame(cls_report)
-            report_csv_file.to_csv(report_save_path)
+            
             ###
             info = {}
 
@@ -328,20 +336,22 @@ if __name__ == "__main__":
             cls_report = classification_report(
                 true_result, 
                 pred_result, 
-                output_dict=True, 
+                output_dict=True if args.csv == 'yes' or args.csv == 'y' else False, 
                 target_names=target_names
             )
-            specificity = compute_specificity(np.array(true_result),np.array(pred_result),classes=set(range(NUM_CLASSES)))
-            for i,target in enumerate(target_names):
-                cls_report[target]['specificity'] = specificity[i]
-            cls_report['macro avg']['specificity'] = np.mean(specificity)
+            if args.csv == 'yes' or args.csv == 'y':
+                specificity = compute_specificity(np.array(true_result),np.array(pred_result),classes=set(range(NUM_CLASSES)))
+                for i,target in enumerate(target_names):
+                    cls_report[target]['specificity'] = specificity[i]
+                cls_report['macro avg']['specificity'] = np.mean(specificity)
+                #save as csv
+                report_save_path = os.path.join(save_dir,f'cross_report_vote.csv')
+                report_csv_file = pd.DataFrame(cls_report)
+                report_csv_file.to_csv(report_save_path)
             print(cls_report)
 
             csv_file = pd.DataFrame(info)
             csv_file.to_csv(save_path_vote, index=False)
 
-            #save as csv
-            report_save_path = os.path.join(save_dir,f'cross_report_vote.csv')
-            report_csv_file = pd.DataFrame(cls_report)
-            report_csv_file.to_csv(report_save_path)
+            
         ###############################################
