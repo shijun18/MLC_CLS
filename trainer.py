@@ -2,8 +2,8 @@
 /*
  * @Author: Jun Shi 
  * @Date: 2022-02-19 20:05:32 
- * @Last Modified by:   Jun Shi 
- * @Last Modified time: 2022-02-19 20:05:32 
+ * @Last Modified by: Jun Shi
+ * @Last Modified time: 2022-02-21 22:55:26
  */
 '''
 import sys
@@ -216,7 +216,7 @@ class My_Classifier(object):
             torch.cuda.empty_cache()
 
             if lr_scheduler is not None:
-                lr_scheduler.step()
+                lr_scheduler.step(epoch+1)
 
             print('Train epoch:{},train_loss:{:.5f},train_acc:{:.5f},train_f1:{:.5f}'
                   .format(epoch, train_loss, train_acc,train_f1))
@@ -501,7 +501,6 @@ class My_Classifier(object):
                 with autocast(self.use_fp16):
                     output = net(data)
                 output = output.float()  # N*C
-
                 result['pred'].extend(torch.argmax(
                     output, 1).detach().tolist())
                 output = F.softmax(output, dim=1)
@@ -519,6 +518,8 @@ class My_Classifier(object):
         net.eval()
 
         test_transformer = transforms.Compose(self.transform)
+
+        result = {}
 
         prob_output = []
         vote_output = []
@@ -549,41 +550,29 @@ class My_Classifier(object):
                 prob_output.append(np.mean(tta_output, axis=0))
                 vote_output.append(max(binary_output,key=binary_output.count))
 
-        return prob_output, vote_output
+        result['pred'] = vote_output
+        result['prob'] = prob_output
+
+        return result
 
     def _get_net(self, net_name):
-        if net_name == 'resnet18':
-            from model.resnet import resnet18
-            net = resnet18(pretrained=self.external_pretrained,input_channels=self.channels,
+        if net_name.startswith('resnet'):
+            import model.resnet as resnet
+            net = resnet.__dict__[net_name](pretrained=self.external_pretrained,input_channels=self.channels,
                            num_classes=self.num_classes,final_drop=self.drop_rate)
-        elif net_name == 'resnet34':
-            from model.resnet import resnet34
-            net = resnet34(pretrained=self.external_pretrained,input_channels=self.channels,
+        elif net_name.startswith('resnest'):
+            import model.resnest as resnest
+            net = resnest.__dict__[net_name](pretrained=self.external_pretrained,input_channels=self.channels,
                            num_classes=self.num_classes,final_drop=self.drop_rate)
-        elif net_name == 'resnet50':
-            from model.resnet import resnet50
-            net = resnet50(pretrained=self.external_pretrained,input_channels=self.channels,
+        elif net_name.startswith('resnext'):
+            import model.resnet as resnext
+            net = resnext.__dict__[net_name](pretrained=self.external_pretrained,input_channels=self.channels,
                            num_classes=self.num_classes,final_drop=self.drop_rate)
-        elif net_name == 'resnest18':
-            from model.resnest import resnest18
-            net = resnest18(pretrained=self.external_pretrained,input_channels=self.channels,
-                           num_classes=self.num_classes,final_drop=self.drop_rate)
-        elif net_name == 'resnest50':
-            from model.resnest import resnest50
-            net = resnest50(pretrained=self.external_pretrained,input_channels=self.channels,
-                           num_classes=self.num_classes,final_drop=self.drop_rate)
-        elif net_name == 'resnext101_32x8d':
-            from model.resnet import resnext101_32x8d
-            net = resnext101_32x8d(pretrained=self.external_pretrained,input_channels=self.channels,
-                           num_classes=self.num_classes,final_drop=self.drop_rate)
-        elif net_name == 'se_resnet18':
-            from model.se_resnet import se_resnet18
-            net = se_resnet18(input_channels=self.channels,
+        elif net_name.startswith('se_resnet'):
+            import model.se_resnet as se_resnet
+            net = se_resnet.__dict__[net_name](input_channels=self.channels,
                               num_classes=self.num_classes,final_drop=self.drop_rate)
-        elif net_name == 'se_resnet10':
-            from model.se_resnet import se_resnet10
-            net = se_resnet10(input_channels=self.channels,
-                              num_classes=self.num_classes,final_drop=self.drop_rate)
+    
         elif net_name.startswith('simplenet'):
             import model.simplenet as simplenet
             net = simplenet.__dict__[net_name](input_channels=self.channels,
@@ -600,21 +589,26 @@ class My_Classifier(object):
             import model.vgg_mod as mod_vgg
             net = mod_vgg.__dict__[net_name](input_channels=self.channels,num_classes=self.num_classes,final_drop=self.drop_rate)
         
-        elif net_name == 'res2net50':
-            from model.res2net import res2net50
-            net = res2net50(input_channels=self.channels,
+        elif net_name.startswith('res2net'):
+            import model.res2net as res2net
+            net = res2net.__dict__[net_name](input_channels=self.channels,
                         	num_classes=self.num_classes,final_drop=self.drop_rate)
-        elif net_name == 'res2net18':
-            from model.res2net import res2net18
-            net = res2net18(input_channels=self.channels,
-                            num_classes=self.num_classes,final_drop=self.drop_rate)
-        elif net_name == 'res2next50':
-            from model.res2next import res2next50
-            net = res2next50(input_channels=self.channels,
-                            num_classes=self.num_classes,final_drop=self.drop_rate)
-        elif net_name == 'res2next18':
-            from model.res2next import res2next18
-            net = res2next18(input_channels=self.channels,
+       
+        elif net_name.startswith('hybridnet'):
+            import model.hybridnet as hybridnet
+            net = hybridnet.__dict__[net_name](img_size=self.input_shape,input_channels=self.channels,
+                            num_classes=self.num_classes)
+        elif net_name.startswith('vit'):
+            import model.vit as vit
+            net = vit.__dict__[net_name](img_size=self.input_shape,in_channels=self.channels,
+                            num_classes=self.num_classes,patch_size=(16,16),spatial_dims=2)
+        elif net_name.startswith('swin_transformer'):
+            import model.swin_transformer as swin_transformer
+            net = swin_transformer.__dict__[net_name](img_size=self.input_shape[0],in_chans=self.channels,
+                            num_classes=self.num_classes,patch_size=4)
+        elif net_name.startswith('res2next'):
+            import model.res2next as res2next
+            net = res2next.__dict__[net_name](input_channels=self.channels,
                             num_classes=self.num_classes,final_drop=self.drop_rate)
         elif 'efficientnet' in net_name:
             # import timm
@@ -716,7 +710,15 @@ class My_Classifier(object):
                             optimizer, T_max=5)
         elif lr_scheduler == 'CosineAnnealingWarmRestarts':
             lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
-                        optimizer, 5, T_mult=2)
+                        optimizer, 5, T_mult=1.)
+        elif lr_scheduler == 'CosineAnnealingWarmUp':
+            from timm.scheduler.cosine_lr import CosineLRScheduler
+            lr_scheduler = CosineLRScheduler(
+                        optimizer, 
+                        t_initial=self.n_epoch,
+                        t_mul=1.,
+                        warmup_lr_init=1e-5,
+                        warmup_t=10)
         return lr_scheduler
 
     def _get_pre_trained(self, weight_path):

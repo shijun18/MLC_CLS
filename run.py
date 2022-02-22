@@ -1,8 +1,9 @@
+import enum
 import os
 import argparse
 from trainer import My_Classifier
 import pandas as pd
-from utils import csv_reader_single
+from utils import csv_reader_single,compute_specificity
 from config import INIT_TRAINER, SETUP_TRAINER,TASK,NUM_CLASSES
 from config import VERSION, CURRENT_FOLD, FOLD_NUM, WEIGHT_PATH_LIST, TTA_TIMES, CSV_PATH
 from sklearn.metrics import classification_report
@@ -210,8 +211,7 @@ if __name__ == "__main__":
 
             start_time = time.time()
             if args.mode == 'inf-tta':
-                 result = {}
-                 result['prob'],result['pred'] = classifier.inference_tta(test_path, TTA_TIMES)
+                 result = classifier.inference_tta(test_path, TTA_TIMES)
             else:
                 result = classifier.inference(test_path)
             print('run time:%.4f' % (time.time()-start_time))
@@ -224,10 +224,25 @@ if __name__ == "__main__":
             
             #metric
             pred_result = [int(case) + add_factor for case in result['pred']]
-            print(classification_report(true_result, pred_result, target_names=target_names))
+            cls_report = classification_report(
+                true_result, 
+                pred_result, 
+                output_dict=True, 
+                target_names=target_names
+            )
+            specificity = compute_specificity(np.array(true_result),np.array(pred_result),classes=set(range(NUM_CLASSES)))
+            
+            for i,target in enumerate(target_names):
+                cls_report[target]['specificity'] = specificity[i]
+            cls_report['macro avg']['specificity'] = np.mean(specificity)
+            print(cls_report)
             # info['prob'] = result['prob']
             csv_file = pd.DataFrame(info)
             csv_file.to_csv(save_path, index=False)
+            #save as csv
+            report_save_path = os.path.join(save_dir,f'fold{str(CURRENT_FOLD)}_report.csv')
+            report_csv_file = pd.DataFrame(cls_report)
+            report_csv_file.to_csv(report_save_path)
         ###############################################
 
         # Inference with cross validation
@@ -258,10 +273,9 @@ if __name__ == "__main__":
                 INIT_TRAINER['weight_path'] = weight_path
                 classifier = My_Classifier(**INIT_TRAINER)
 
-                prob_output, vote_output = classifier.inference_tta(
-                    test_path, TTA_TIMES)
-                all_prob_output.append(prob_output)
-                all_vote_output.append(vote_output)
+                fold_result = classifier.inference_tta(test_path, TTA_TIMES)
+                all_prob_output.append(fold_result['prob'])
+                all_vote_output.append(fold_result['pred'])
 
             avg_output = np.mean(all_prob_output, axis=0)
             result['prob'].extend(avg_output.tolist())
@@ -282,11 +296,25 @@ if __name__ == "__main__":
             
             #metric
             pred_result = [int(case) + add_factor for case in result['pred']]
-            print(classification_report(true_result, pred_result, target_names=target_names))
+            cls_report = classification_report(
+                true_result, 
+                pred_result, 
+                output_dict=True, 
+                target_names=target_names
+            )
+            specificity = compute_specificity(np.array(true_result),np.array(pred_result),classes=set(range(NUM_CLASSES)))
+            for i,target in enumerate(target_names):
+                cls_report[target]['specificity'] = specificity[i]
+            cls_report['macro avg']['specificity'] = np.mean(specificity)
+            print(cls_report)
             
             csv_file = pd.DataFrame(info)
             csv_file.to_csv(save_path, index=False)
-
+            #save as csv
+            report_save_path = os.path.join(save_dir,f'cross_report.csv')
+            report_csv_file = pd.DataFrame(cls_report)
+            report_csv_file.to_csv(report_save_path)
+            ###
             info = {}
 
             info[KEY[TASK][0]] = [os.path.basename(case) for case in test_path]
@@ -297,8 +325,23 @@ if __name__ == "__main__":
 
             #metric
             pred_result = [int(case) + add_factor for case in result['vote_pred']]
-            print(classification_report(true_result, pred_result, target_names=target_names))
+            cls_report = classification_report(
+                true_result, 
+                pred_result, 
+                output_dict=True, 
+                target_names=target_names
+            )
+            specificity = compute_specificity(np.array(true_result),np.array(pred_result),classes=set(range(NUM_CLASSES)))
+            for i,target in enumerate(target_names):
+                cls_report[target]['specificity'] = specificity[i]
+            cls_report['macro avg']['specificity'] = np.mean(specificity)
+            print(cls_report)
 
             csv_file = pd.DataFrame(info)
             csv_file.to_csv(save_path_vote, index=False)
+
+            #save as csv
+            report_save_path = os.path.join(save_dir,f'cross_report_vote.csv')
+            report_csv_file = pd.DataFrame(cls_report)
+            report_csv_file.to_csv(report_save_path)
         ###############################################

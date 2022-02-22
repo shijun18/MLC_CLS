@@ -30,7 +30,7 @@ class AddNoise(object):
 
     def __call__(self, image):
         if image.mode == 'RGB':
-            image = random_noise(np.array(image)[...,0],mode='s&p') 
+            image = random_noise(np.array(image),mode='s&p') 
             image = Image.fromarray((image*255).astype(np.uint8)).convert('RGB')
         else:
             image = random_noise(np.array(image),mode='s&p') 

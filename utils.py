@@ -2,6 +2,25 @@ import os
 import shutil
 import glob
 import pandas as pd
+import numpy as np
+
+def compute_specificity(y_true: np.array, y_pred: np.array, classes: set = None):
+
+    if classes is None: # Determine classes from the values
+        classes = set(np.concatenate((np.unique(y_true), np.unique(y_pred))))
+
+    specs = []
+    for cls in classes:
+        y_true_cls = (y_true == cls).astype(int)
+        y_pred_cls = (y_pred == cls).astype(int)
+
+        fp = sum(y_pred_cls[y_true_cls != 1])
+        tn = sum(y_pred_cls[y_true_cls == 0] == False)
+
+        specificity_val = tn / (tn + fp)
+        specs.append(specificity_val)
+
+    return specs
 
 def csv_reader_single(csv_file,key_col=None,value_col=None):
     '''

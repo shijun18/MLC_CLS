@@ -1,10 +1,9 @@
  
 __all__ = ['resnet18','resnet34', 'resnet50','resnest18','resnest50',\
             'efficientnet-b5','efficientnet-b7','efficientnet-b3','efficientnet-b8','densenet121',\
-            'densenet169','regnetx-200MF','regnetx-600MF','regnety-600MF','regnety-4.0GF',\
-            'regnety-8.0GF','regnety-16GF','res2next50', 'simplenet','simplenetv2',\
-            'simplenetv3','simplenetv4','simplenetv5','simplenetv6','simplenetv7',\
-            'simplenetv8','simplenetv9','simplenetv10','res2next18','se_resnet18', 'se_resnet10']
+            'densenet169','se_resnet18', 'se_resnet50','regnetx-200MF','regnety-8.0GF',\
+            'regnety-16GF','res2next50','regnetx-600MF','regnety-600MF','regnety-4.0GF',\
+            'hybridnet_v1','swin_transformer','vit_12x12']
 
 
 
@@ -22,14 +21,14 @@ num_classes = {
     'MLC_Gamma2mm':5
 }
 
-TASK = 'MLC_Gamma2mm'
-NET_NAME = 'efficientnet-b5' #regnetx-200MF
-VERSION = 'v6.0-pretrained-x1' 
-DEVICE = '2'
+TASK = 'MLC'
+NET_NAME = 'hybridnet_v1' #regnetx-200MF
+VERSION = 'v21.0-x3' 
+DEVICE = '3'
 # Must be True when pre-training and inference
-PRE_TRAINED = False	
+PRE_TRAINED = True	
 # 1,2,3,4
-CURRENT_FOLD = 3
+CURRENT_FOLD = 4
 GPU_NUM = len(DEVICE.split(','))
 FOLD_NUM = 5
 TTA_TIMES = 11
@@ -88,7 +87,7 @@ TRANSFORM = {
 }
 
 SHAPE = {
-    'MLC':(128, 128),
+    'MLC':(224, 224),
     'MLC_Dose':(128, 128),
     'MLC_Gamma1mm':(128, 128),
     'MLC_Gamma2mm':(128, 128)
@@ -105,7 +104,7 @@ CHANNEL = {
 # Arguments when trainer initial
 INIT_TRAINER = {
     'net_name': NET_NAME,
-    'lr': 1e-3 if not PRE_TRAINED else 5e-4, #1e-3
+    'lr': 1e-5 if not PRE_TRAINED else 5e-4, #1e-3
     'n_epoch': EPOCH[TASK],
     'channels': CHANNEL[TASK],
     'num_classes': NUM_CLASSES,
@@ -159,8 +158,8 @@ SETUP_TRAINER = {
     'optimizer': 'AdamW', 
     'loss_fun': LOSS_FUN,
     'class_weight': CLASS_WEIGHT[TASK],
-    'lr_scheduler': 'CosineAnnealingWarmRestarts', #'MultiStepLR','CosineAnnealingWarmRestarts' for fine-tune and warmup
+    'lr_scheduler': 'MultiStepLR', #'MultiStepLR','CosineAnnealingWarmRestarts' for fine-tune and warmup
     'balance_sample':True if 'balance' in VERSION else False,#False
     'monitor':MONITOR[TASK],
-    'repeat_factor':1.0
+    'repeat_factor':3.0
 }
