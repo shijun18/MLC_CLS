@@ -1,18 +1,42 @@
 import torch
-from torch import nn
+import torch.nn as nn
+try:
+  from torch.hub import load_state_dict_from_url
+except ImportError:
+  from torch.utils.model_zoo import load_url as load_state_dict_from_url
+
+
+__all__ = ['ResNet', 'resnet18', 'resnet34', 'resnet50', 'resnet101',
+           'resnet152', 'resnext50_32x4d', 'resnext101_32x8d',
+           'wide_resnet50_2', 'wide_resnet101_2']
+
+
+model_urls = {
+    'resnet18': 'https://download.pytorch.org/models/resnet18-f37072fd.pth',
+    'resnet34': 'https://download.pytorch.org/models/resnet34-b627a593.pth',
+    'resnet50': 'https://download.pytorch.org/models/resnet50-0676ba61.pth',
+    'resnet101': 'https://download.pytorch.org/models/resnet101-63fe2227.pth',
+    'resnet152': 'https://download.pytorch.org/models/resnet152-394f9c45.pth',
+    'resnext50_32x4d': 'https://download.pytorch.org/models/resnext50_32x4d-7cdf4587.pth',
+    'resnext101_32x8d': 'https://download.pytorch.org/models/resnext101_32x8d-8ba56ff5.pth',
+    'wide_resnet50_2': 'https://download.pytorch.org/models/wide_resnet50_2-95faca4d.pth',
+    'wide_resnet101_2': 'https://download.pytorch.org/models/wide_resnet101_2-32ee1156.pth',
+}
 
 
 
-def BasicBlock(cin, cout, kernel_size=(5,12), stride=1, use_norm=False,padding=0):
-    """
-    :param cin: Num of input channels
-    :param cout: Num of output channels
-    """
-    layers = [nn.Conv2d(cin, cout, kernel_size, stride=stride, padding=padding, bias=False)]
-    if use_norm:
-        layers.append(nn.BatchNorm2d(cout))
-    layers.append(nn.ReLU(True))
-    return nn.Sequential(*layers)
+
+def conv3x3(in_planes, out_planes, stride=1, groups=1, dilation=1):
+    """3x3 convolution with padding"""
+    return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
+                     padding=dilation, groups=groups, bias=False, dilation=dilation)
+
+
+def conv1x1(in_planes, out_planes, stride=1):
+    """1x1 convolution"""
+    return nn.Conv2d(in_planes, out_planes, kernel_size=1, stride=stride, bias=False)
+
+
 
 
 def DilatedBlock(cin, cout, kernel_size=(3,3), stride=1, use_norm=False, padding=0, dilation=1):
@@ -37,581 +61,234 @@ def ASPP(cin,cout,dilation_list=[1,12,24,36],use_norm=False):
     return nn.ModuleList(aspp_list)
 
 
+
+class BasicBlock(nn.Module):
+    expansion = 1
+
+    def __init__(self, inplanes, planes, stride=1, downsample=None, groups=1,
+                 base_width=64, dilation=1, norm_layer=None):
+        super(BasicBlock, self).__init__()
+        if norm_layer is None:
+            norm_layer = nn.BatchNorm2d
+        if groups != 1 or base_width != 64:
+            raise ValueError('BasicBlock only supports groups=1 and base_width=64')
+        if dilation > 1:
+            raise NotImplementedError("Dilation > 1 not supported in BasicBlock")
+        # Both self.conv1 and self.downsample layers downsample the input when stride != 1
+        self.conv1 = conv3x3(inplanes, planes, stride)
+        self.bn1 = norm_layer(planes)
+        self.relu = nn.ReLU(inplace=True)
+        self.conv2 = conv3x3(planes, planes)
+        self.bn2 = norm_layer(planes)
+        self.downsample = downsample
+        self.stride = stride
+
+    def forward(self, x):
+        identity = x
+
+        out = self.conv1(x)
+        out = self.bn1(out)
+        out = self.relu(out)
+
+        out = self.conv2(out)
+        out = self.bn2(out)
+
+        if self.downsample is not None:
+            identity = self.downsample(x)
+
+        out += identity
+        out = self.relu(out)
+
+        return out
+
+
+class Bottleneck(nn.Module):
+    # Bottleneck in torchvision places the stride for downsampling at 3x3 convolution(self.conv2)
+    # while original implementation places the stride at the first 1x1 convolution(self.conv1)
+    # according to "Deep residual learning for image recognition"https://arxiv.org/abs/1512.03385.
+    # This variant is also known as ResNet V1.5 and improves accuracy according to
+    # https://ngc.nvidia.com/catalog/model-scripts/nvidia:resnet_50_v1_5_for_pytorch.
+
+    expansion = 4
+
+    def __init__(self, inplanes, planes, stride=1, downsample=None, groups=1,
+                 base_width=64, dilation=1, norm_layer=None):
+        super(Bottleneck, self).__init__()
+        if norm_layer is None:
+            norm_layer = nn.BatchNorm2d
+        width = int(planes * (base_width / 64.)) * groups
+        # Both self.conv2 and self.downsample layers downsample the input when stride != 1
+        self.conv1 = conv1x1(inplanes, width)
+        self.bn1 = norm_layer(width)
+        self.conv2 = conv3x3(width, width, stride, groups, dilation)
+        self.bn2 = norm_layer(width)
+        self.conv3 = conv1x1(width, planes * self.expansion)
+        self.bn3 = norm_layer(planes * self.expansion)
+        self.relu = nn.ReLU(inplace=True)
+        self.downsample = downsample
+        self.stride = stride
+
+    def forward(self, x):
+        identity = x
+
+        out = self.conv1(x)
+        out = self.bn1(out)
+        out = self.relu(out)
+
+        out = self.conv2(out)
+        out = self.bn2(out)
+        out = self.relu(out)
+
+        out = self.conv3(out)
+        out = self.bn3(out)
+
+        if self.downsample is not None:
+            identity = self.downsample(x)
+
+        out += identity
+        out = self.relu(out)
+
+        return out
+
+
 class SimpleNet(nn.Module):
 
-    def __init__(self, block, num_features, depth=4, num_classes=2, input_channels=1,final_drop=0.0):
-        """
-        Construct a SimpleNet
-        """
+    def __init__(self, block, layers, depth=4, num_classes=2, input_channels=1, zero_init_residual=False,
+                 groups=1, final_drop=0.5,width_per_group=64, replace_stride_with_dilation=None,
+                 norm_layer=None):
         super(SimpleNet, self).__init__()
-        kernel_size_list = [(15,15),(15,15),(15,15),(15,15)]
-        self.backbone = []
-        self.backbone.append(block(input_channels, num_features[0], kernel_size=kernel_size_list[0],stride=2))
-        for i in range(1,depth):
-            self.backbone.append(block(num_features[i-1], num_features[i], kernel_size=kernel_size_list[i], stride=2, use_norm=i%2==1))
-        self.backbone = nn.Sequential(*self.backbone)
+        if norm_layer is None:
+            norm_layer = nn.BatchNorm2d
+        self._norm_layer = norm_layer
+
+        self.inplanes = 32
+        self.dilation = 1
+        if replace_stride_with_dilation is None:
+            # each element in the tuple indicates if we should replace
+            # the 2x2 stride with a dilated convolution instead
+            replace_stride_with_dilation = [False, False, False]
+        if len(replace_stride_with_dilation) != 3:
+            raise ValueError("replace_stride_with_dilation should be None "
+                             "or a 3-element tuple, got {}".format(replace_stride_with_dilation))
+        self.groups = groups
+        self.base_width = width_per_group
+        self.stem = nn.Sequential(
+            nn.Conv2d(input_channels, self.inplanes, kernel_size=7, stride=1, padding=3,bias=False),
+            norm_layer(self.inplanes),
+            nn.ReLU(inplace=True)
+        )
+        num_fea = [64,128,256,512]
+        self.layers = []
+        for i in range(depth):
+            if i == 0:
+                layer = self._make_layer(block, num_fea[i], layers[i], stride=2)
+            else:
+                layer = self._make_layer(block, num_fea[i], layers[i], stride=2, dilate=replace_stride_with_dilation[i-1])
+            self.layers.append(layer)
         
-        # self.bridge = nn.AdaptiveAvgPool2d((1, 1))
-        self.bridge = nn.AdaptiveMaxPool2d((1, 1))
-        self.drop = nn.Dropout(final_drop) if final_drop > 0.0 else None
-        self.cls = nn.Sequential(
-            nn.Linear(num_features[-1], num_classes)
-        )
+        self.layers = nn.ModuleList(self.layers)
 
-        # for m in self.modules():
-        #     if isinstance(m, nn.Conv2d):
-        #         nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
-        #     elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
-        #         nn.init.constant_(m.weight, 1)
-        #         nn.init.constant_(m.bias, 0)
+        self.out_feature = num_fea[depth-1] * block.expansion
+
+        # save for load imagenet pre-trained weight
+        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+        self.drop = nn.Dropout(final_drop) if final_drop > 0.0 else None
+        self.fc = nn.Linear(512 * block.expansion, 1000)
+        
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+            elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
+
+        # Zero-initialize the last BN in each residual branch,
+        # so that the residual branch starts with zeros, and each residual block behaves like an identity.
+        # This improves the model by 0.2~0.3% according to https://arxiv.org/abs/1706.02677
+        if zero_init_residual:
+            for m in self.modules():
+                if isinstance(m, Bottleneck):
+                    nn.init.constant_(m.bn3.weight, 0)
+                elif isinstance(m, BasicBlock):
+                    nn.init.constant_(m.bn2.weight, 0)
+
+    def _make_layer(self, block, planes, blocks, stride=1, dilate=False):
+        norm_layer = self._norm_layer
+        downsample = None
+        previous_dilation = self.dilation
+        if dilate:
+            self.dilation *= stride
+            stride = 1
+        if stride != 1 or self.inplanes != planes * block.expansion:
+            downsample = nn.Sequential(
+                conv1x1(self.inplanes, planes * block.expansion, stride),
+                norm_layer(planes * block.expansion),
+            )
+
+        layers = []
+        layers.append(block(self.inplanes, planes, stride, downsample, self.groups,
+                            self.base_width, previous_dilation, norm_layer))
+        self.inplanes = planes * block.expansion
+        for _ in range(1, blocks):
+            layers.append(block(self.inplanes, planes, groups=self.groups,
+                                base_width=self.base_width, dilation=self.dilation,
+                                norm_layer=norm_layer))
+
+        return nn.Sequential(*layers)
+
+    def _forward_impl(self, x):
+        # See note [TorchScript super()]
+        out_x = []
+        x = self.stem(x)
+        out_x.append(x)
+        for layer in self.layers:
+            x = layer(x)
+            out_x.append(x)
+
+        return out_x
 
     def forward(self, x):
-        x = self.backbone(x)
-        x = self.bridge(x).view(x.size(0),-1)
-        if self.drop:
-            x = self.drop(x)
-        x = self.cls(x)
-        return x
+        return self._forward_impl(x)
 
 
-
-class SimpleNetV2(nn.Module):
-
-    def __init__(self, block, num_features, depth=4, num_classes=2, input_channels=1,final_drop=0.0):
-        """
-        Construct a SimpleNet
-        """
-        super(SimpleNetV2, self).__init__()
-        kernel_size_list = [(17,17),(17,17),(17,17),(17,17)]
-        self.backbone = []
-        self.backbone.append(block(input_channels, num_features[0], kernel_size=kernel_size_list[0],stride=2))
-        for i in range(1,depth):
-            self.backbone.append(block(num_features[i-1], num_features[i], kernel_size=kernel_size_list[i], stride=2, use_norm=i%2==1))
-        self.backbone = nn.Sequential(*self.backbone)
-        # print(self.backbone)
-        # self.bridge = nn.AdaptiveAvgPool2d((1, 1))
-        self.bridge = nn.AdaptiveMaxPool2d((1, 1))
-        self.drop = nn.Dropout(final_drop) if final_drop > 0.0 else None
-        self.cls = nn.Sequential(
-            nn.Linear(num_features[-1], num_classes)
-        )
-
-        # for m in self.modules():
-        #     if isinstance(m, nn.Conv2d):
-        #         nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
-        #     elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
-        #         nn.init.constant_(m.weight, 1)
-        #         nn.init.constant_(m.bias, 0)
-
-    def forward(self, x):
-        x = self.backbone(x)
-        x = self.bridge(x).view(x.size(0),-1)
-        if self.drop:
-            x = self.drop(x)
-        x = self.cls(x)
-        return x
-
-
-
-class SimpleNetV3(nn.Module):
-
-    def __init__(self, block, num_features, depth=4, num_classes=2, input_channels=1,final_drop=0.0):
-        """
-        Construct a SimpleNet
-        """
-        super(SimpleNetV3, self).__init__()
-        kernel_size_list = [(17,17),(17,17),(17,17),(17,17)]
-        dilation_list = [1,12,24,36]
-        self.backbone = []
-        for i in range(depth-2):
-            if i == 0:
-                self.backbone.append(block(input_channels, num_features[i], kernel_size=kernel_size_list[i],stride=2,use_norm=i%2==1,padding=(kernel_size_list[i][0]//2,kernel_size_list[i][1]//2)))
-            else:
-                self.backbone.append(block(num_features[i-1], num_features[i], kernel_size=kernel_size_list[i],stride=2,use_norm=i%2==1,padding=(kernel_size_list[i][0]//2,kernel_size_list[i][1]//2)))
-        self.backbone = nn.Sequential(*self.backbone)
-        self.aspp = ASPP(num_features[i],num_features[i+1],dilation_list=dilation_list,use_norm=False)
-        self.fusion = block(num_features[-2]*len(dilation_list),num_features[-1],kernel_size=(5,5),stride=2,use_norm=True)
-        self.bridge = nn.AdaptiveMaxPool2d((1, 1))
-        self.drop = nn.Dropout(final_drop) if final_drop > 0.0 else None
-        self.cls = nn.Sequential(
-            nn.Linear(num_features[-1], num_classes)
-        )
-
-        # for m in self.modules():
-        #     if isinstance(m, nn.Conv2d):
-        #         nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
-        #     elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
-        #         nn.init.constant_(m.weight, 1)
-        #         nn.init.constant_(m.bias, 0)
-
-    def forward(self, x):
-        x = self.backbone(x)
-        fea_list = []
-        for aspp in self.aspp:
-            fea = aspp(x)
-            fea_list.append(fea)
-        x = torch.cat(fea_list,dim=1)
-        x = self.fusion(x)
-        x = self.bridge(x)
-        x = torch.flatten(x, 1)
-        if self.drop:
-            x = self.drop(x)
-        x = self.cls(x)
-        return x
-
-
-class SimpleNetV4(nn.Module):
-
-    def __init__(self, block, num_features, depth=4, num_classes=2, input_channels=1,final_drop=0.0):
-        """
-        Construct a SimpleNet
-        """
-        super(SimpleNetV4, self).__init__()
-        self.fea_extractor = []
-        kernel_size_list =[[(21,21),(21,21),(21,21)],\
-                           [(17,17),(17,17),(17,17)],\
-                           [(13,13),(13,13),(13,13)],\
-                           [(9,9),(9,9),(9,9)],\
-                           [(5,5),(5,5),(5,5)]]
-
-        for kernel_size in kernel_size_list:
-            backbone = []
-            for i in range(depth-1):
-                if i == 0:
-                    backbone.append(block(input_channels, num_features[i], kernel_size=kernel_size[i],stride=2,use_norm=i%2==1,padding=(kernel_size[i][0]//2,kernel_size[i][1]//2)))
-                else:
-                    backbone.append(block(num_features[i-1], num_features[i], kernel_size=kernel_size[i],stride=2,use_norm=i%2==1,padding=(kernel_size[i][0]//2,kernel_size[i][1]//2)))
-            self.fea_extractor.append(nn.Sequential(*backbone))
-        self.fea_extractor = nn.ModuleList(self.fea_extractor)
-        self.fusion = block(num_features[-2]*len(kernel_size_list),num_features[-1],kernel_size=(5,5),stride=2,use_norm=True)
-        self.bridge = nn.AdaptiveMaxPool2d((1, 1))
-        self.drop = nn.Dropout(final_drop) if final_drop > 0.0 else None
-        self.cls = nn.Sequential(
-            nn.Linear(num_features[-1], num_classes)
-        )
-
-        # for m in self.modules():
-        #     if isinstance(m, nn.Conv2d):
-        #         nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
-        #     elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
-        #         nn.init.constant_(m.weight, 1)
-        #         nn.init.constant_(m.bias, 0)
-
-    def forward(self, x):
-        fea_list = []
-        for extractor in self.fea_extractor:
-            fea = extractor(x)
-            fea_list.append(fea)
-        x = torch.cat(fea_list,dim=1)
-        x = self.fusion(x)
-        x = self.bridge(x)
-        x = torch.flatten(x, 1)
-        if self.drop:
-            x = self.drop(x)
-        x = self.cls(x)
-        return x
-
-'''
-class SimpleNetV5(nn.Module):
-
-    def __init__(self, block, num_features, depth=4, num_classes=2, input_channels=1,final_drop=0.0):
-        """
-        Construct a SimpleNet
-        """
-        super(SimpleNetV5, self).__init__()
-        self.fea_extractor = []
-        kernel_size_list =[[(5,15),(5,15),(5,15)],\
-                           [(15,5),(15,5),(15,5)]]
-
-        for kernel_size in kernel_size_list:
-            backbone = []
-            for i in range(depth-1):
-                if i == 0:
-                    backbone.append(block(input_channels, num_features[i], kernel_size=kernel_size[i],stride=2,use_norm=i%2==1,padding=(kernel_size[i][0]//2,kernel_size[i][1]//2)))
-                else:
-                    backbone.append(block(num_features[i-1], num_features[i], kernel_size=kernel_size[i],stride=2,use_norm=i%2==1,padding=(kernel_size[i][0]//2,kernel_size[i][1]//2)))
-            self.fea_extractor.append(nn.Sequential(*backbone))
-        self.fea_extractor = nn.ModuleList(self.fea_extractor)
-        self.fusion = block(num_features[-2]*len(kernel_size_list),num_features[-1],kernel_size=(1,1),stride=1,use_norm=True)
-        self.bridge = nn.AdaptiveMaxPool2d((1, 1))
-        self.drop = nn.Dropout(final_drop) if final_drop > 0.0 else None
-        self.cls = nn.Sequential(
-            nn.Linear(num_features[-1], num_classes)
-        )
-
-        # for m in self.modules():
-        #     if isinstance(m, nn.Conv2d):
-        #         nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
-        #     elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
-        #         nn.init.constant_(m.weight, 1)
-        #         nn.init.constant_(m.bias, 0)
-
-    def forward(self, x):
-        fea_list = []
-        for extractor in self.fea_extractor:
-            fea = extractor(x)
-            fea_list.append(fea)
-        x = torch.cat(fea_list,dim=1)
-        x = self.fusion(x)
-        x = self.bridge(x)
-        x = torch.flatten(x, 1)
-        if self.drop:
-            x = self.drop(x)
-        x = self.cls(x)
-        return x
-'''
-
-class SimpleNetV5(nn.Module):
-
-    def __init__(self, block, num_features, depth=4, num_classes=2, input_channels=1,final_drop=0.0):
-        """
-        Construct a SimpleNet
-        """
-        super(SimpleNetV5, self).__init__()
-        self.fea_extractor = []
-        kernel_size_list =[[(15,15),(15,15),(15,15),(15,15)],\
-                           [(11,11),(11,11),(11,11),(11,11)],\
-                           [(7,7),(7,7),(7,7),(7,7)],\
-                           [(3,3),(3,3),(3,3),(3,3)]]
-
-        for kernel_size in kernel_size_list:
-            backbone = []
-            for i in range(depth):
-                if i == 0:
-                    backbone.append(block(input_channels, num_features[i], kernel_size=kernel_size[i],stride=2,use_norm=i%2==1,padding=(kernel_size[i][0]//2,kernel_size[i][1]//2)))
-                else:
-                    backbone.append(block(num_features[i-1], num_features[i], kernel_size=kernel_size[i],stride=2,use_norm=i%2==1,padding=(kernel_size[i][0]//2,kernel_size[i][1]//2)))
-            self.fea_extractor.append(nn.Sequential(*backbone))
-        self.fea_extractor = nn.ModuleList(self.fea_extractor)
-        self.bridge = nn.AdaptiveMaxPool2d((1, 1))
-        self.drop = nn.Dropout(final_drop) if final_drop > 0.0 else None
-        self.cls = nn.Sequential(
-            nn.Linear(num_features[-1]*len(kernel_size_list), num_classes)
-        )
-
-        # for m in self.modules():
-        #     if isinstance(m, nn.Conv2d):
-        #         nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
-        #     elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
-        #         nn.init.constant_(m.weight, 1)
-        #         nn.init.constant_(m.bias, 0)
-
-    def forward(self, x):
-        fea_list = []
-        for extractor in self.fea_extractor:
-            fea = extractor(x)
-            fea_list.append(fea)
-        x = torch.cat(fea_list,dim=1)
-        x = self.bridge(x)
-        x = torch.flatten(x, 1)
-        if self.drop:
-            x = self.drop(x)
-        x = self.cls(x)
-        return x
-
-
-
-class SimpleNetV6(nn.Module):
-
-    def __init__(self, block, num_features, depth=4, num_classes=2, input_channels=1,final_drop=0.0):
-        """
-        Construct a SimpleNet
-        """
-        super(SimpleNetV6, self).__init__()
-        self.fea_extractor = []
-        kernel_size_list =[[(17,17),(17,17),(17,17),(17,17)],\
-                           [(13,13),(13,13),(13,13),(13,13)],\
-                           [(9,9),(9,9),(9,9),(9,9)]]
-
-        for kernel_size in kernel_size_list:
-            backbone = []
-            for i in range(depth):
-                if i == 0:
-                    backbone.append(block(input_channels, num_features[i], kernel_size=kernel_size[i],stride=2,use_norm=i%2==1,padding=(kernel_size[i][0]//2,kernel_size[i][1]//2)))
-                else:
-                    backbone.append(block(num_features[i-1], num_features[i], kernel_size=kernel_size[i],stride=2,use_norm=i%2==1,padding=(kernel_size[i][0]//2,kernel_size[i][1]//2)))
-            self.fea_extractor.append(nn.Sequential(*backbone))
-        self.fea_extractor = nn.ModuleList(self.fea_extractor)
-        self.bridge =nn.AdaptiveMaxPool2d((1, 1))
-        self.drop = nn.Dropout(final_drop) if final_drop > 0.0 else None
-        self.cls = nn.Sequential(
-            nn.Linear(num_features[-1]*len(kernel_size_list), num_classes)
-        )
-
-        # for m in self.modules():
-        #     if isinstance(m, nn.Conv2d):
-        #         nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
-        #     elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
-        #         nn.init.constant_(m.weight, 1)
-        #         nn.init.constant_(m.bias, 0)
-
-    def forward(self, x):
-        fea_list = []
-        for extractor in self.fea_extractor:
-            fea = extractor(x)
-            fea_list.append(fea)
-        x = torch.cat(fea_list,dim=1)
-        x = self.bridge(x)
-        x = torch.flatten(x, 1)
-        if self.drop:
-            x = self.drop(x)
-        x = self.cls(x)
-        return x
-
-
-class SimpleNetV7(nn.Module):
-
-    def __init__(self, block, num_features, depth=4, num_classes=2, input_channels=1,final_drop=0.0):
-        """
-        Construct a SimpleNet
-        """
-        super(SimpleNetV7, self).__init__()
-        self.fea_extractor = []
-        kernel_size_list =[[(17,17),(17,17),(17,17),(17,17)],\
-                           [(13,13),(11,13),(11,13),(13,13)],\
-                           [(9,9),(9,9),(9,9),(9,9)],\
-                           [(5,5),(5,5),(5,5),(5,5)]]
-
-        for kernel_size in kernel_size_list:
-            backbone = []
-            for i in range(depth):
-                if i == 0:
-                    backbone.append(block(input_channels, num_features[i], kernel_size=kernel_size[i],stride=2,use_norm=i%2==1,padding=(kernel_size[i][0]//2,kernel_size[i][1]//2)))
-                else:
-                    backbone.append(block(num_features[i-1], num_features[i], kernel_size=kernel_size[i],stride=2,use_norm=i%2==1,padding=(kernel_size[i][0]//2,kernel_size[i][1]//2)))
-            self.fea_extractor.append(nn.Sequential(*backbone))
-        self.fea_extractor = nn.ModuleList(self.fea_extractor)
-        self.bridge =nn.AdaptiveMaxPool2d((1, 1))
-        self.drop = nn.Dropout(final_drop) if final_drop > 0.0 else None
-        self.cls = nn.Sequential(
-            nn.Linear(num_features[-1]*len(kernel_size_list), num_classes)
-        )
-
-        # for m in self.modules():
-        #     if isinstance(m, nn.Conv2d):
-        #         nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
-        #     elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
-        #         nn.init.constant_(m.weight, 1)
-        #         nn.init.constant_(m.bias, 0)
-
-    def forward(self, x):
-        fea_list = []
-        for extractor in self.fea_extractor:
-            fea = extractor(x)
-            fea_list.append(fea)
-        x = torch.cat(fea_list,dim=1)
-        x = self.bridge(x)
-        x = torch.flatten(x, 1)
-        if self.drop:
-            x = self.drop(x)
-        x = self.cls(x)
-        return x
-
-
-class SimpleNetV8(nn.Module):
-
-    def __init__(self, block, num_features, depth=4, num_classes=2, input_channels=1,final_drop=0.0):
-        """
-        Construct a SimpleNet
-        """
-        super(SimpleNetV8, self).__init__()
-        self.fea_extractor = []
-        kernel_size_list =[[(17,17),(17,17),(17,17),(17,17)],\
-                           [(13,13),(13,13),(13,13),(13,13)],\
-                           [(9,9),(9,9),(9,9),(9,9)],\
-                           [(5,5),(5,5),(5,5),(5,5)]]
-
-        for kernel_size in kernel_size_list:
-            backbone = []
-            for i in range(depth):
-                if i == 0:
-                    backbone.append(block(input_channels, num_features[i], kernel_size=kernel_size[i],stride=2,use_norm=i%2==1,padding=(kernel_size[i][0]//2,kernel_size[i][1]//2)))
-                else:
-                    backbone.append(block(num_features[i-1], num_features[i], kernel_size=kernel_size[i],stride=2,use_norm=i%2==1,padding=(kernel_size[i][0]//2,kernel_size[i][1]//2)))
-            self.fea_extractor.append(nn.Sequential(*backbone))
-        self.fea_extractor = nn.ModuleList(self.fea_extractor)
-        self.bridge =nn.AdaptiveMaxPool2d((1, 1))
-        self.drop = nn.Dropout(final_drop) if final_drop > 0.0 else None
-        self.cls = nn.Sequential(
-            nn.Linear(num_features[-1]*len(kernel_size_list), num_classes)
-        )
-
-        # for m in self.modules():
-        #     if isinstance(m, nn.Conv2d):
-        #         nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
-        #     elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
-        #         nn.init.constant_(m.weight, 1)
-        #         nn.init.constant_(m.bias, 0)
-
-    def forward(self, x):
-        fea_list = []
-        for extractor in self.fea_extractor:
-            fea = extractor(x)
-            fea_list.append(fea)
-        x = torch.cat(fea_list,dim=1)
-        x = self.bridge(x)
-        x = torch.flatten(x, 1)
-        if self.drop:
-            x = self.drop(x)
-        x = self.cls(x)
-        return x
-
-class SimpleNetV9(nn.Module):
-
-    def __init__(self, block, num_features, depth=4, num_classes=2, input_channels=1,final_drop=0.0):
-        """
-        Construct a SimpleNet
-        """
-        super(SimpleNetV9, self).__init__()
-        kernel_size_list = [(9,9),(15,15)]
-        dilation_list = [1,12,24,36]
-        self.backbone = []
-        for i in range(depth-2):
-            if i == 0:
-                self.backbone.append(block(input_channels, num_features[i], kernel_size=kernel_size_list[i],stride=2,use_norm=i%2==1,padding=(kernel_size_list[i][0]//2,kernel_size_list[i][1]//2)))
-            else:
-                self.backbone.append(block(num_features[i-1], num_features[i], kernel_size=kernel_size_list[i],stride=2,use_norm=i%2==1,padding=(kernel_size_list[i][0]//2,kernel_size_list[i][1]//2)))
-        self.backbone = nn.Sequential(*self.backbone)
-        self.aspp = ASPP(num_features[i],num_features[i+1],dilation_list=dilation_list,use_norm=False)
-        self.fusion = block(num_features[-2]*len(dilation_list),num_features[-1],kernel_size=(5,5),stride=2,use_norm=True)
-        self.bridge = nn.AdaptiveMaxPool2d((1, 1))
-        self.drop = nn.Dropout(final_drop) if final_drop > 0.0 else None
-        self.cls = nn.Sequential(
-            nn.Linear(num_features[-1], num_classes)
-        )
-
-        # for m in self.modules():
-        #     if isinstance(m, nn.Conv2d):
-        #         nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
-        #     elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
-        #         nn.init.constant_(m.weight, 1)
-        #         nn.init.constant_(m.bias, 0)
-
-    def forward(self, x):
-        x = self.backbone(x)
-        fea_list = []
-        for aspp in self.aspp:
-            fea = aspp(x)
-            fea_list.append(fea)
-        x = torch.cat(fea_list,dim=1)
-        x = self.fusion(x)
-        x = self.bridge(x)
-        x = torch.flatten(x, 1)
-        if self.drop:
-            x = self.drop(x)
-        x = self.cls(x)
-        return x
-
-class SimpleNetV10(nn.Module):
-
-    def __init__(self, block, num_features, depth=4, num_classes=2, input_channels=1,final_drop=0.0):
-        """
-        Construct a SimpleNet
-        """
-        super(SimpleNetV10, self).__init__()
-        kernel_size_list = [(9,9),(15,15)]
-        dilation_list = [1,12,24,36]
-        self.backbone = []
-        for i in range(depth-2):
-            if i == 0:
-                self.backbone.append(block(input_channels, num_features[i], kernel_size=kernel_size_list[i],stride=2,use_norm=i%2==1,padding=(kernel_size_list[i][0]//2,kernel_size_list[i][1]//2)))
-            else:
-                self.backbone.append(block(num_features[i-1], num_features[i], kernel_size=kernel_size_list[i],stride=2,use_norm=i%2==1,padding=(kernel_size_list[i][0]//2,kernel_size_list[i][1]//2)))
-        self.backbone = nn.Sequential(*self.backbone)
-        self.aspp = ASPP(num_features[i],num_features[i+1],dilation_list=dilation_list,use_norm=False)
-        self.fusion = block(num_features[-2]*len(dilation_list),num_features[-1],kernel_size=(5,5),stride=2,use_norm=True)
-        # self.bridge = nn.AdaptiveMaxPool2d((1, 1))
-        self.bridge = nn.AdaptiveAvgPool2d((1, 1))
-        self.drop = nn.Dropout(final_drop) if final_drop > 0.0 else None
-        self.cls = nn.Sequential(
-            nn.Linear(num_features[-1], num_classes)
-        )
-
-        # for m in self.modules():
-        #     if isinstance(m, nn.Conv2d):
-        #         nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
-        #     elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
-        #         nn.init.constant_(m.weight, 1)
-        #         nn.init.constant_(m.bias, 0)
-
-    def forward(self, x):
-        x = self.backbone(x)
-        fea_list = []
-        for aspp in self.aspp:
-            fea = aspp(x)
-            fea_list.append(fea)
-        x = torch.cat(fea_list,dim=1)
-        x = self.fusion(x)
-        x = self.bridge(x)
-        x = torch.flatten(x, 1)
-        if self.drop:
-            x = self.drop(x)
-        x = self.cls(x)
-        return x
-
-
-
-def simplenet(**kwargs):
-    
-    model = SimpleNet(BasicBlock, [64,128,256,512], 4, **kwargs)
+def _simplenet(arch, block, layers, pretrained, progress, **kwargs):
+    model = SimpleNet(block, layers, **kwargs)
+    if pretrained:
+        state_dict = load_state_dict_from_url(model_urls[arch],
+                                              progress=progress)
+        model.load_state_dict(state_dict)
     return model
 
 
-def simplenetv2(**kwargs):
-    
-    model = SimpleNetV2(BasicBlock, [64,128,256,512], 4, **kwargs)
-    return model
+def simplenet18(pretrained=False, progress=True, **kwargs):
+    return _simplenet('simplenet18', BasicBlock, [2, 2, 2, 2], pretrained, progress,
+                   **kwargs)
 
 
-def simplenetv3(**kwargs):
-    
-    model = SimpleNetV3(BasicBlock, [64,128,256,512], 4, **kwargs)
-    return model
+def simplenet34(pretrained=False, progress=True, **kwargs):
+    return _simplenet('simplenet34', BasicBlock, [3, 4, 6, 3], pretrained, progress,
+                   **kwargs)
 
 
-def simplenetv4(**kwargs):
-    
-    model = SimpleNetV4(BasicBlock, [64,128,256,512], 4, **kwargs)
-    return model
+def simplenet50(pretrained=False, progress=True, **kwargs):
+    return _simplenet('simplenet50', Bottleneck, [3, 4, 6, 3], pretrained, progress,
+                   **kwargs)
 
 
-def simplenetv5(**kwargs):
-    
-    model = SimpleNetV5(BasicBlock, [64,128,256,512], 4, **kwargs)
-    return model
+def simplenet101(pretrained=False, progress=True, **kwargs):
+    return _simplenet('simplenet101', Bottleneck, [3, 4, 23, 3], pretrained, progress,
+                   **kwargs)
 
 
-def simplenetv6(**kwargs):
-    
-    model = SimpleNetV6(BasicBlock, [64,128,256,512], 4, **kwargs)
-    return model
+def simplenet152(pretrained=False, progress=True, **kwargs):
+    return _simplenet('simplenet152', Bottleneck, [3, 8, 36, 3], pretrained, progress,
+                   **kwargs)
 
 
-def simplenetv7(**kwargs):
-    
-    model = SimpleNetV7(BasicBlock, [64,128,256,512], 4, **kwargs)
-    return model
-
-
-def simplenetv8(**kwargs):
-    
-    model = SimpleNetV8(BasicBlock, [64,128,256,512], 4, **kwargs)
-    return model
-
-
-def simplenetv9(**kwargs):
-    
-    model = SimpleNetV9(BasicBlock, [32,64,128,256], 4, **kwargs)
-    return model
-
-def simplenetv10(**kwargs):
-    
-    model = SimpleNetV10(BasicBlock, [32,64,128,256], 4, **kwargs)
-    return model
 
 if __name__ == "__main__":
   
-  net = simplenetv3(input_channels=1,num_classes=2)
+  net = simplenet18(depth=3,input_channels=1,num_classes=2)
 
   from torchsummary import summary
   import os 
