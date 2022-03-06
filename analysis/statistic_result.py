@@ -80,23 +80,32 @@ if __name__ == '__main__':
     # input_path = './result/MLC'
     # result_path = './result/result_metric.csv'
     # net_name = ['resnet18','resnet50','resnest50','efficientnet-b5','se_resnet18', 'se_resnet50', \
-    #     'hybridnet_v1','swin_transformer','vit_12x12','hybridnet_v2','hybridnet_v3']
+    #     'hybridnet_v1','swin_transformer','vit_12x12','hybridnet_v2','hybridnet_v3',\
+    #     'hybridnet_v3','hybridnet_v3','hybridnet_v4','hybridnet_v4']
     # statistics_metric(input_path,result_path,net_name,['1.0-x1-newaug','3.0-x1-newaug',\
+    #     '5.0-x1-newaug','6.0-x1-newaug','12.0-x1-newaug','13.0-x1-newaug','21.0-x1-newaug','22.0-x1-newaug',\
+    #     '23.0-x1-newaug','24.0-x1-newaug','25.0-x1-newaug','25.0-x3-newaug','25.0-x6-newaug','26.0-x1-newaug','26.0-x3-newaug',])
+
+
+    # input_path = './result/MLC'
+    # result_path = './result/result_auc.csv'
+    # net_name = ['resnet18','resnet50','resnest50','efficientnet-b5','se_resnet18', 'se_resnet50', \
+    #     'hybridnet_v1','swin_transformer','vit_12x12','hybridnet_v2','hybridnet_v3']
+    # labels_name = [
+    #     'Shift_png',
+    #     'Random_png',
+    #     'Original_png',
+    #     'Expand_png',
+    #     'Contract_png'
+    # ]
+    # statistics_auc(input_path,result_path,net_name,labels_name,['1.0-x1-newaug','3.0-x1-newaug',\
     #     '5.0-x1-newaug','6.0-x1-newaug','12.0-x1-newaug','13.0-x1-newaug','21.0-x1-newaug','22.0-x1-newaug',\
     #     '23.0-x1-newaug','24.0-x1-newaug','25.0-x1-newaug'])
 
-
     input_path = './result/MLC'
-    result_path = './result/result_auc.csv'
+    result_path = './result/result_metric_x1.csv'
     net_name = ['resnet18','resnet50','resnest50','efficientnet-b5','se_resnet18', 'se_resnet50', \
-        'hybridnet_v1','swin_transformer','vit_12x12','hybridnet_v2','hybridnet_v3']
-    labels_name = [
-        'Shift_png',
-        'Random_png',
-        'Original_png',
-        'Expand_png',
-        'Contract_png'
-    ]
-    statistics_auc(input_path,result_path,net_name,labels_name,['1.0-x1-newaug','3.0-x1-newaug',\
-        '5.0-x1-newaug','6.0-x1-newaug','12.0-x1-newaug','13.0-x1-newaug','21.0-x1-newaug','22.0-x1-newaug',\
-        '23.0-x1-newaug','24.0-x1-newaug','25.0-x1-newaug'])
+        'hybridnet_v1','swin_transformer','vit_12x12','hybridnet_v3','hybridnet_v3','hybridnet_v3','hybridnet_v4']
+    statistics_metric(input_path,result_path,net_name,['1.0-x1','3.0-x1',\
+        '5.0-x1','6.0-x1','12.0-x1','13.0-x1','21.0-x3','22.0-x3',\
+        '23.0-x3','25.0-x1','25.0-x3','25.0-x6','26.0-x3'])

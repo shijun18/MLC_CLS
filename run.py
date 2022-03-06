@@ -3,7 +3,7 @@ import os
 import argparse
 from trainer import My_Classifier
 import pandas as pd
-from utils import csv_reader_single,compute_specificity
+from utils import csv_reader_single,compute_specificity, get_weight_path
 from config import INIT_TRAINER, SETUP_TRAINER,TASK,NUM_CLASSES
 from config import VERSION, CURRENT_FOLD, FOLD_NUM, WEIGHT_PATH_LIST, TTA_TIMES, CSV_PATH
 from sklearn.metrics import classification_report
@@ -125,10 +125,6 @@ if __name__ == "__main__":
     else:
         path_list = list(label_dict.keys())
     
-    if args.mode != 'train-cross' and args.mode != 'inf-cross':
-        classifier = My_Classifier(**INIT_TRAINER)
-        print(get_parameter_number(classifier.net))
-
     # Training with cross validation
     ###############################################
     if args.mode == 'train-cross':
@@ -143,9 +139,8 @@ if __name__ == "__main__":
                 INIT_TRAINER['weight_path'] = WEIGHT_PATH_LIST[current_fold-1]
             
             classifier = My_Classifier(**INIT_TRAINER)
-
-            if current_fold == 0:
-                print(get_parameter_number(classifier.net))
+            print(get_parameter_number(classifier.net))
+                
 
             if 'balance' in VERSION:
                 train_path, val_path = get_cross_validation_balance(
@@ -187,6 +182,8 @@ if __name__ == "__main__":
         SETUP_TRAINER['cur_fold'] = CURRENT_FOLD
 
         start_time = time.time()
+        classifier = My_Classifier(**INIT_TRAINER)
+        print(get_parameter_number(classifier.net))
         classifier.trainer(**SETUP_TRAINER)
 
         print('run time:%.4f' % (time.time()-start_time))
@@ -208,45 +205,51 @@ if __name__ == "__main__":
             # test_id.sort(key=lambda x:x.split('.')[0])
             # test_path = [os.path.join(args.path, case)
             #             for case in test_id]
-            
-            save_path = os.path.join(save_dir,f'submission_fold{CURRENT_FOLD}.csv')
+            for current_fold in range(5, 6):
+                weight_path = get_weight_path('./ckpt/{}/{}/fold{}'.format(TASK,VERSION,str(current_fold)))
+                print("Inference %d fold..." % (current_fold))
+                print("weight: %s"%weight_path)
+                INIT_TRAINER['weight_path'] = weight_path
+                classifier = My_Classifier(**INIT_TRAINER)
+                print(get_parameter_number(classifier.net))
+                save_path = os.path.join(save_dir,f'submission_fold{current_fold}.csv')
 
-            start_time = time.time()
-            if args.mode == 'inf-tta':
-                 result = classifier.inference_tta(test_path, TTA_TIMES)
-            else:
-                result = classifier.inference(test_path)
-            print('run time:%.4f' % (time.time()-start_time))
+                start_time = time.time()
+                if args.mode == 'inf-tta':
+                    result = classifier.inference_tta(test_path, TTA_TIMES)
+                else:
+                    result = classifier.inference(test_path)
+                print('run time:%.4f' % (time.time()-start_time))
 
-            info = {}
-            info[KEY[TASK][0]] = [os.path.basename(case) for case in test_path]
-            info[KEY[TASK][1]] = [int(case) + add_factor for case in result['pred']]
-            for i in range(NUM_CLASSES):
-                info[f'prob_{str(i+1)}'] = np.array(result['prob'])[:,i].tolist()
-            
-            #metric
-            pred_result = [int(case) + add_factor for case in result['pred']]
-            cls_report = classification_report(
-                true_result, 
-                pred_result, 
-                output_dict=True if args.csv == 'yes' or args.csv == 'y' else False, 
-                target_names=target_names
-            )
-            if args.csv == 'yes' or args.csv == 'y':
-                specificity = compute_specificity(np.array(true_result),np.array(pred_result),classes=set(range(NUM_CLASSES)))
+                info = {}
+                info[KEY[TASK][0]] = [os.path.basename(case) for case in test_path]
+                info[KEY[TASK][1]] = [int(case) + add_factor for case in result['pred']]
+                for i in range(NUM_CLASSES):
+                    info[f'prob_{str(i+1)}'] = np.array(result['prob'])[:,i].tolist()
                 
-                for i,target in enumerate(target_names):
-                    cls_report[target]['specificity'] = specificity[i]
-                cls_report['macro avg']['specificity'] = np.mean(specificity)
-                #save as csv
-                report_save_path = os.path.join(save_dir,f'fold{str(CURRENT_FOLD)}_report.csv')
-                report_csv_file = pd.DataFrame(cls_report)
-                report_csv_file.to_csv(report_save_path)
-            
-            print(cls_report)
-            # info['prob'] = result['prob']
-            csv_file = pd.DataFrame(info)
-            csv_file.to_csv(save_path, index=False)
+                #metric
+                pred_result = [int(case) + add_factor for case in result['pred']]
+                cls_report = classification_report(
+                    true_result, 
+                    pred_result, 
+                    output_dict=True if args.csv == 'yes' or args.csv == 'y' else False, 
+                    target_names=target_names
+                )
+                if args.csv == 'yes' or args.csv == 'y':
+                    specificity = compute_specificity(np.array(true_result),np.array(pred_result),classes=set(range(NUM_CLASSES)))
+                    
+                    for i,target in enumerate(target_names):
+                        cls_report[target]['specificity'] = specificity[i]
+                    cls_report['macro avg']['specificity'] = np.mean(specificity)
+                    #save as csv
+                    report_save_path = os.path.join(save_dir,f'fold{str(current_fold)}_report.csv')
+                    report_csv_file = pd.DataFrame(cls_report)
+                    report_csv_file.to_csv(report_save_path)
+                
+                print(cls_report)
+                # info['prob'] = result['prob']
+                csv_file = pd.DataFrame(info)
+                csv_file.to_csv(save_path, index=False)
             
         ###############################################
 

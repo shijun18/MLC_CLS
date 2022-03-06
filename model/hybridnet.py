@@ -26,13 +26,14 @@ class HybridNet(nn.Module):
                 img_size=self.trans_input_size,
                 patch_size=(4,4),
                 num_classes=num_classes,
-                depths=[2, 6]
+                depths=[2, 6],
+                num_heads=[3, 6]
             )
         elif trans_net.startswith('vit'):
             self.patch_size = (int(self.trans_input_size[0]/8),int(self.trans_input_size[1]/8))
             if min(self.patch_size) < 4:
                 raise ValueError('path size must be larger than 4!')
-            self.trans_net = swin_transformer.__dict__[trans_net](
+            self.trans_net = vit.__dict__[trans_net](
                 in_channels=self.cnn_out_feature,
                 img_size=self.trans_input_size,
                 patch_size=self.patch_size,
@@ -63,6 +64,22 @@ def hybridnet_v2(**kwargs):
                     out_index=2,
                     **kwargs)
     return net
+
+def hybridnet_v3(**kwargs):
+    net = HybridNet(cnn_net='simplenet50',
+                    trans_net='swin_transformer',
+                    out_index=2,
+                    **kwargs)
+    return net
+
+
+def hybridnet_v4(**kwargs):
+    net = HybridNet(cnn_net='se_simplenet18',
+                    trans_net='swin_transformer',
+                    out_index=2,
+                    **kwargs)
+    return net
+
 
 
 if __name__ == "__main__":

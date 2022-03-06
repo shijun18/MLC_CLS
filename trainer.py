@@ -3,7 +3,7 @@
  * @Author: Jun Shi 
  * @Date: 2022-02-19 20:05:32 
  * @Last Modified by: Jun Shi
- * @Last Modified time: 2022-02-21 22:55:26
+ * @Last Modified time: 2022-02-22 22:01:51
  */
 '''
 import sys
@@ -33,6 +33,8 @@ from data_utils.transforms import RandomRotate,DeNoise,SquarePad,AddNoise,Trimmi
 
 from sklearn import metrics
 import random
+import warnings
+warnings.filterwarnings('ignore')
 # GPU version.
 
 
@@ -717,8 +719,8 @@ class My_Classifier(object):
                         optimizer, 
                         t_initial=self.n_epoch,
                         t_mul=1.,
-                        warmup_lr_init=1e-5,
-                        warmup_t=10)
+                        warmup_lr_init=self.lr/4,
+                        warmup_t=self.n_epoch//3)
         return lr_scheduler
 
     def _get_pre_trained(self, weight_path):
