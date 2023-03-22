@@ -19,6 +19,7 @@ KEY = {
 }
 
 ADD_FACTOR = {
+    'MLC_v2':0,
     'MLC':0,
     'MLC_Dose':0,
     'MLC_Gamma1mm':0,
@@ -26,14 +27,15 @@ ADD_FACTOR = {
 }
 
 target_names  = [
-    'Shift_png',
-    'Random_png',
-    'Original_png',
-    'Expand_png',
-    'Contract_png'
+    'Shift',
+    'Random',
+    'Original',
+    'Expand',
+    'Contract'
 ]
 
 TEST_DATA = {
+    'MLC_v2':'./converter/csv_file/MLC_v2_test.csv',
     'MLC':'./converter/csv_file/MLC_test.csv',
     'MLC_Dose':'./converter/csv_file/MLC_dose_test.csv',
     'MLC_Gamma1mm':'./converter/csv_file/MLC_gamma1mm_test.csv',

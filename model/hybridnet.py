@@ -91,6 +91,6 @@ if __name__ == "__main__":
 
   from torchsummary import summary
   import os 
-  os.environ['CUDA_VISIBLE_DEVICES'] = '2'
+  os.environ['CUDA_VISIBLE_DEVICES'] = '1'
   net = net.cuda()
   summary(net,input_size=(3,224,224),batch_size=1,device='cuda')

@@ -4,7 +4,6 @@ import pandas as pd
 from PIL import Image
 import numpy as np
 from tqdm import tqdm
-import librosa
 
 def sample_count(input_path,save_path):
 
@@ -99,36 +98,21 @@ def cal_mean_std_single(data_path):
     print('l std:%.3f' % l_std)
 
 
-def voice_time(input_path,save_path):
-    info = []
-    for subitem in os.scandir(input_path):
-        if subitem.is_dir():
-            for item in os.scandir(subitem.path):
-                info_item = [item.name]
-                try:
-                    info_item.append(librosa.get_duration(filename=item.path))
-                except:
-                    info_item.append(-1)
-                info.append(info_item)
-        else:
-            info_item = [subitem.name]
-            try:
-                info_item.append(librosa.get_duration(filename=subitem.path))
-            except:
-                info_item.append(-1)
-            info.append(info_item)
-    
-    col = ['file','time']
-    csv_file = pd.DataFrame(columns=col,data=info)
-    csv_file.to_csv(save_path,index=False)
-    
-
 if __name__ == '__main__':
 
-    input_csv = './csv_file/MLC_gamma1mm.csv'
+    # input_csv = './csv_file/MLC_gamma1mm.csv'
+    # path_list = pd.read_csv(input_csv)['id'].values.tolist()
+    # test_input_csv = './csv_file/MLC_gamma1mm_test.csv'
+    # test_path_list = pd.read_csv(test_input_csv)['id'].values.tolist()
+    # path_list += test_path_list
+    # # cal_mean_std(path_list)
+    # cal_mean_std_single(path_list)
+
+
+    input_csv = './csv_file/MLC_v2.csv'
     path_list = pd.read_csv(input_csv)['id'].values.tolist()
-    test_input_csv = './csv_file/MLC_gamma1mm_test.csv'
+    test_input_csv = './csv_file/MLC_v2_test.csv'
     test_path_list = pd.read_csv(test_input_csv)['id'].values.tolist()
     path_list += test_path_list
-    # cal_mean_std(path_list)
-    cal_mean_std_single(path_list)
+    cal_mean_std(path_list)
+    # cal_mean_std_single(path_list)

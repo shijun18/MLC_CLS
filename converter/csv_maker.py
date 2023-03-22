@@ -4,12 +4,20 @@ import glob
 import random
 import shutil
 
+# INDEX = {
+#     'Shift_png':0,
+#     'Random_png':1,
+#     'Original_png':2,
+#     'Expand_png':3,
+#     'Contract_png':4
+# }
+
 INDEX = {
-    'Shift_png':0,
-    'Random_png':1,
-    'Original_png':2,
-    'Expand_png':3,
-    'Contract_png':4
+    'Shift':0,
+    'Random':1,
+    'Original':2,
+    'Expand':3,
+    'Contract':4
 }
 
 def make_label_csv(input_path,csv_path,mid_dir=None):
@@ -53,8 +61,15 @@ if __name__ == "__main__":
     # csv_path = './csv_file/MLC_test.csv'
     # make_label_csv(input_path,csv_path)
 
-    input_path = '/staff/shijun/torch_projects/MLC_CLS/dataset/raw_data/train'
-    csv_path = './csv_file/MLC_gamma2mm.csv'
+    # input_path = '/staff/shijun/torch_projects/MLC_CLS/dataset/raw_data/train'
+    # csv_path = './csv_file/MLC_gamma2mm.csv'
     # input_path = '/staff/shijun/torch_projects/MLC_CLS/dataset/raw_data/test'
     # csv_path = './csv_file/MLC_gamma2mm_test.csv'
-    make_label_csv(input_path,csv_path,mid_dir='gamma2mm')
+    # make_label_csv(input_path,csv_path,mid_dir='gamma2mm')
+
+    input_path = '/staff/shijun/torch_projects/MLC_CLS/dataset/MLC_v2/train'
+    csv_path = './csv_file/MLC_v2.csv'
+    make_label_csv(input_path,csv_path)
+    input_path = '/staff/shijun/torch_projects/MLC_CLS/dataset/MLC_v2/test'
+    csv_path = './csv_file/MLC_v2_test.csv'
+    make_label_csv(input_path,csv_path)

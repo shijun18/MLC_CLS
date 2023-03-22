@@ -8,6 +8,7 @@ __all__ = ['resnet18','resnet34', 'resnet50','resnest18','resnest50',\
 
 
 data_config = {
+    'MLC_v2':'./converter/csv_file/MLC_v2.csv',
     'MLC':'./converter/csv_file/MLC.csv',
     'MLC_Dose':'./converter/csv_file/MLC_dose.csv',
     'MLC_Gamma1mm':'./converter/csv_file/MLC_gamma1mm.csv',
@@ -15,18 +16,19 @@ data_config = {
 }
 
 num_classes = {
+    'MLC_v2':5,
     'MLC':5,
     'MLC_Dose':5,
     'MLC_Gamma1mm':5,
     'MLC_Gamma2mm':5
 }
 
-TASK = 'MLC'
-NET_NAME = 'hybridnet_v3' #regnetx-200MF
-VERSION = 'v25.0-x6' 
-DEVICE = '0'
+TASK = 'MLC_v2'
+NET_NAME = 'hybridnet_v1' #regnetx-200MF
+VERSION = 'v21.0-x3' 
+DEVICE = '2'
 # Must be True when pre-training and inference
-PRE_TRAINED = True	
+PRE_TRAINED = False	
 # 1,2,3,4,5
 CURRENT_FOLD = 2
 GPU_NUM = len(DEVICE.split(','))
@@ -52,6 +54,7 @@ else:
 # WEIGHT_PATH_LIST = None
 
 MEAN = {
+    'MLC_v2':[0.493,0.495,0.501],
     'MLC':[0.499, 0.492, 0.493],
     'MLC_Dose':[0.499],
     'MLC_Gamma1mm':[0.492],
@@ -59,6 +62,7 @@ MEAN = {
 }
 
 STD = {
+    'MLC_v2':[0.147,0.113,0.062],
     'MLC':[0.065, 0.152, 0.118],
     'MLC_Dose':[0.065],
     'MLC_Gamma1mm':[0.152],
@@ -66,6 +70,7 @@ STD = {
 }
 
 MILESTONES = {
+    'MLC_v2':[30,60,90],
     'MLC':[30,60,90],
     'MLC_Dose':[30,60,90],
     'MLC_Gamma1mm':[30,60,90],
@@ -73,6 +78,7 @@ MILESTONES = {
 }
 
 EPOCH = {
+    'MLC_v2':150,
     'MLC':150,
     'MLC_Dose':150,
     'MLC_Gamma1mm':150,
@@ -80,6 +86,7 @@ EPOCH = {
 }
 
 TRANSFORM = {
+    'MLC_v2':[2,3,4,6,7,8,9,19] if 'newaug' not in VERSION else [2,3,4,6,7,8,9],
     'MLC':[2,3,4,6,7,8,9,19] if 'newaug' not in VERSION else [2,3,4,6,7,8,9], #[2,9] noaug [2,3,4,6,7,8,9,19]
     'MLC_Dose':[2,3,4,6,7,8,9,19],
     'MLC_Gamma1mm':[2,3,4,6,7,8,9,19],
@@ -87,14 +94,16 @@ TRANSFORM = {
 }
 print('transform list:',TRANSFORM['MLC'])
 SHAPE = {
+    'MLC_v2':(224,224),
     'MLC':(224, 224),
-    'MLC_Dose':(128, 128),
-    'MLC_Gamma1mm':(128, 128),
-    'MLC_Gamma2mm':(128, 128)
+    'MLC_Dose':(224, 224),
+    'MLC_Gamma1mm':(224, 224),
+    'MLC_Gamma2mm':(224, 224)
 }
 
 
 CHANNEL = {
+    'MLC_v2':3,
     'MLC':3,
     'MLC_Dose':1,
     'MLC_Gamma1mm':1,
@@ -121,7 +130,7 @@ INIT_TRAINER = {
     'std': STD[TASK],
     'gamma': 0.1,
     'milestones': MILESTONES[TASK],
-    'use_fp16':True,
+    'use_fp16':False,
     'transform':TRANSFORM[TASK],
     'drop_rate': 0.5, #0.5
     'smothing':0.15,
@@ -138,6 +147,7 @@ LOSS_FUN = 'Cross_Entropy'
 # Arguments when perform the trainer
 
 CLASS_WEIGHT = {
+    'MLC_v2':None,
     'MLC':None,
     'MLC_Dose':None,
     'MLC_Gamma1mm':None,
@@ -146,6 +156,7 @@ CLASS_WEIGHT = {
 
 
 MONITOR = {
+    'MLC_v2':'val_f1',
     'MLC':'val_acc',
     'MLC_Dose':'val_acc',
     'MLC_Gamma1mm':'val_acc',
