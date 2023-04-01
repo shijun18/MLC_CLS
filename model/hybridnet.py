@@ -81,6 +81,13 @@ def hybridnet_v4(**kwargs):
     return net
 
 
+def hybridnet_v5(**kwargs):
+    net = HybridNet(cnn_net='se_simplenet50',
+                    trans_net='swin_transformer',
+                    out_index=2,
+                    **kwargs)
+    return net
+
 
 if __name__ == "__main__":
   

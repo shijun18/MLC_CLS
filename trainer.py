@@ -59,7 +59,7 @@ class My_Classifier(object):
     def __init__(self, net_name=None, gamma=0.1, lr=1e-3, n_epoch=1, channels=1, num_classes=3, input_shape=None, crop=48,
                  batch_size=6, num_workers=0, device=None, pre_trained=False, weight_path=None, weight_decay=0.,
                  momentum=0.95, mean=(0.105393,), std=(0.203002,), milestones=None,use_fp16=False,transform=None,
-                 drop_rate=0.0,smothing=0.1,external_pretrained=False,use_mixup=False,use_cutmix=False,mix_only=False):
+                 drop_rate=0.0,smothing=0.1,external_pretrained=False,use_mixup=False,use_cutmix=False,mix_only=False,use_maxpool=False):
         super(My_Classifier, self).__init__()
 
         self.net_name = net_name
@@ -96,6 +96,7 @@ class My_Classifier(object):
         self.use_mixup = use_mixup
         self.use_cutmix = use_cutmix
         self.mix_only = mix_only
+        self.use_maxpool = use_maxpool
 
         os.environ['CUDA_VISIBLE_DEVICES'] = self.device
         self.net = self._get_net(self.net_name)
@@ -133,7 +134,8 @@ class My_Classifier(object):
         self.transform = [self.transform_list[i-1] for i in transform]
 
     def trainer(self, train_path, val_path, label_dict, cur_fold, output_dir=None, log_dir=None, optimizer='Adam',
-                loss_fun='Cross_Entropy', class_weight=None, lr_scheduler=None,balance_sample=False,monitor='val_acc',repeat_factor=1.0):
+                loss_fun='Cross_Entropy', class_weight=None, lr_scheduler=None,balance_sample=False,monitor='val_acc',
+                repeat_factor=1.0):
 
         torch.manual_seed(1)
         print('Device:{}'.format(self.device))
@@ -157,6 +159,7 @@ class My_Classifier(object):
         else:
             os.makedirs(output_dir)
 
+    
         self.writer = SummaryWriter(log_dir)
         self.global_step = self.start_epoch * \
             math.ceil(len(train_path)/self.batch_size)
@@ -600,6 +603,8 @@ class My_Classifier(object):
             import model.hybridnet as hybridnet
             net = hybridnet.__dict__[net_name](img_size=self.input_shape,input_channels=self.channels,
                             num_classes=self.num_classes)
+            if self.use_maxpool:
+                net.trans_net.avgpool = nn.AdaptiveMaxPool1d(1)
         elif net_name.startswith('vit'):
             import model.vit as vit
             net = vit.__dict__[net_name](img_size=self.input_shape,in_channels=self.channels,

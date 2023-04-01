@@ -11,13 +11,6 @@ import time
 import numpy as np
 import random
 
-KEY = {
-    'MLC':['image_id','category_id'],
-    'MLC_Dose':['image_id','category_id'],
-    'MLC_Gamma1mm':['image_id','category_id'],
-    'MLC_Gamma2mm':['image_id','category_id']
-}
-
 ADD_FACTOR = {
     'MLC_v2':0,
     'MLC':0,
@@ -37,9 +30,9 @@ target_names  = [
 TEST_DATA = {
     'MLC_v2':'./converter/csv_file/MLC_v2_test.csv',
     'MLC':'./converter/csv_file/MLC_test.csv',
-    'MLC_Dose':'./converter/csv_file/MLC_dose_test.csv',
-    'MLC_Gamma1mm':'./converter/csv_file/MLC_gamma1mm_test.csv',
-    'MLC_Gamma2mm':'./converter/csv_file/MLC_gamma2mm_test.csv',
+    'MLC_Dose':'./converter/csv_file/MLC_dose_v2_test.csv',
+    'MLC_Gamma1mm':'./converter/csv_file/MLC_gamma1mm_v2_test.csv',
+    'MLC_Gamma2mm':'./converter/csv_file/MLC_gamma2mm_v2_test.csv',
 }
 
 def get_cross_validation_balance(path_list, fold_num, current_fold):
@@ -207,7 +200,7 @@ if __name__ == "__main__":
             # test_id.sort(key=lambda x:x.split('.')[0])
             # test_path = [os.path.join(args.path, case)
             #             for case in test_id]
-            for current_fold in range(5, 6):
+            for current_fold in range(1, 6):
                 weight_path = get_weight_path('./ckpt/{}/{}/fold{}'.format(TASK,VERSION,str(current_fold)))
                 print("Inference %d fold..." % (current_fold))
                 print("weight: %s"%weight_path)
@@ -224,8 +217,9 @@ if __name__ == "__main__":
                 print('run time:%.4f' % (time.time()-start_time))
 
                 info = {}
-                info[KEY[TASK][0]] = [os.path.basename(case) for case in test_path]
-                info[KEY[TASK][1]] = [int(case) + add_factor for case in result['pred']]
+                info['id'] = [os.path.basename(case) for case in test_path]
+                info['true'] = true_result
+                info['pred'] = [int(case) + add_factor for case in result['pred']]
                 for i in range(NUM_CLASSES):
                     info[f'prob_{str(i+1)}'] = np.array(result['prob'])[:,i].tolist()
                 
@@ -298,8 +292,9 @@ if __name__ == "__main__":
 
             info = {}
 
-            info[KEY[TASK][0]] = [os.path.basename(case) for case in test_path]
-            info[KEY[TASK][1]] = [int(case) + add_factor for case in result['pred']]
+            info['id'] = [os.path.basename(case) for case in test_path]
+            info['true'] = true_result
+            info['pred'] = [int(case) + add_factor for case in result['pred']]
             for i in range(NUM_CLASSES):
                 info[f'prob_{str(i+1)}'] = np.array(result['prob'])[:,i].tolist()
             # info['prob'] = result['prob']
@@ -329,9 +324,9 @@ if __name__ == "__main__":
             
             ###
             info = {}
-
-            info[KEY[TASK][0]] = [os.path.basename(case) for case in test_path]
-            info[KEY[TASK][1]] = [int(case) + add_factor for case in result['vote_pred']]
+            info['id'] = [os.path.basename(case) for case in test_path]
+            info['true'] = true_result
+            info['pred'] = [int(case) + add_factor for case in result['vote_pred']]
             for i in range(NUM_CLASSES):
                 info[f'prob_{str(i+1)}'] = np.array(result['prob'])[:,i].tolist()
             # info['prob'] = result['prob']

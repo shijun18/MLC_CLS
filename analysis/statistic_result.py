@@ -54,7 +54,7 @@ def statistics_auc(input_path,result_path,net_name,labels_name,ver=[1.0,2.0,3.0,
             item.append(net_name[k])
 
             file_csv = pd.read_csv(csv_path)
-            true_ = np.asarray(file_csv['category_id'].values.tolist())
+            true_ = np.asarray(file_csv['true'].values.tolist())
             print(true_.shape)
             prob_list = [f'prob_{str(i+1)}' for i in range(len(labels_name))]
             prob_ = np.asarray(file_csv[prob_list].values)
@@ -66,7 +66,7 @@ def statistics_auc(input_path,result_path,net_name,labels_name,ver=[1.0,2.0,3.0,
             
             csv_info.append(item)
             
-            if i == 4:
+            if i == 5:
                 columns = ['version','net_name'] + labels_name
     
     csv_file = pd.DataFrame(data=csv_info,columns=columns)
@@ -77,52 +77,46 @@ def statistics_auc(input_path,result_path,net_name,labels_name,ver=[1.0,2.0,3.0,
 
 if __name__ == '__main__':
     
-    # input_path = './result/MLC'
-    # result_path = './result/result_metric.csv'
-    # net_name = ['resnet18','resnet50','resnest50','efficientnet-b5','se_resnet18', 'se_resnet50', \
-    #     'hybridnet_v1','swin_transformer','vit_12x12','hybridnet_v2','hybridnet_v3',\
-    #     'hybridnet_v3','hybridnet_v3','hybridnet_v4','hybridnet_v4']
-    # statistics_metric(input_path,result_path,net_name,['1.0-x1-newaug','3.0-x1-newaug',\
-    #     '5.0-x1-newaug','6.0-x1-newaug','12.0-x1-newaug','13.0-x1-newaug','21.0-x1-newaug','22.0-x1-newaug',\
-    #     '23.0-x1-newaug','24.0-x1-newaug','25.0-x1-newaug','25.0-x3-newaug','25.0-x6-newaug','26.0-x1-newaug','26.0-x3-newaug',])
+
+    # input_path = './result/MLC_v2'
+    # result_path = './result/MLC_v2/result_metric_x3_maxpool.csv'
+    
+    # net_name = ['resnet18','resnet50','efficientnet-b5','se_resnet50', \
+    #     'hybridnet_v1','swin_transformer','hybridnet_v3','hybridnet_v5','hybridnet_v5']
+    # statistics_metric(input_path,result_path,net_name,['1.0-x3','3.0-x3',\
+    #     '6.0-x3','13.0-x3','21.0-x3','22.0-x3','25.0-x3','27.0-x3','27.0-x3-maxpool'])
 
 
-    # input_path = './result/MLC'
-    # result_path = './result/result_auc.csv'
-    # net_name = ['resnet18','resnet50','resnest50','efficientnet-b5','se_resnet18', 'se_resnet50', \
-    #     'hybridnet_v1','swin_transformer','vit_12x12','hybridnet_v2','hybridnet_v3',\
-    #     'hybridnet_v3','hybridnet_v3','hybridnet_v4','hybridnet_v4']
+    # input_path = './result/MLC_v2'
+    # result_path = './result/MLC_v2/result_auc_x3_maxpool.csv'
+    # net_name = ['resnet18','resnet50','efficientnet-b5','se_resnet50', \
+    #     'hybridnet_v1','swin_transformer','hybridnet_v3','hybridnet_v5','hybridnet_v5']
     # labels_name = [
-    #     'Shift_png',
-    #     'Random_png',
-    #     'Original_png',
-    #     'Expand_png',
-    #     'Contract_png'
+    #     'Shift',
+    #     'Random',
+    #     'Original',
+    #     'Expand',
+    #     'Contract'
     # ]
-    # statistics_auc(input_path,result_path,net_name,labels_name,['1.0-x1-newaug','3.0-x1-newaug',\
-    #     '5.0-x1-newaug','6.0-x1-newaug','12.0-x1-newaug','13.0-x1-newaug','21.0-x1-newaug','22.0-x1-newaug',\
-    #     '23.0-x1-newaug','24.0-x1-newaug','25.0-x1-newaug','25.0-x3-newaug','25.0-x6-newaug','26.0-x1-newaug','26.0-x3-newaug',])
-
-    # input_path = './result/MLC'
-    # result_path = './result/result_metric_x1.csv'
-    # net_name = ['resnet18','resnet50','resnest50','efficientnet-b5','se_resnet18', 'se_resnet50', \
-    #     'hybridnet_v1','swin_transformer','vit_12x12','hybridnet_v3','hybridnet_v3','hybridnet_v3','hybridnet_v4']
-    # statistics_metric(input_path,result_path,net_name,['1.0-x1','3.0-x1',\
-    #     '5.0-x1','6.0-x1','12.0-x1','13.0-x1','21.0-x3','22.0-x3',\
-    #     '23.0-x3','25.0-x1','25.0-x3','25.0-x6','26.0-x3'])
+    # statistics_auc(input_path,result_path,net_name,labels_name,['1.0-x3','3.0-x3',\
+    #     '6.0-x3','13.0-x3','21.0-x3','22.0-x3','25.0-x3','27.0-x3','27.0-x3-maxpool'])
+    
+    type_ = 'MLC_Gamma2mm'
+    input_path = f'./result/{type_}'
+    result_path = f'./result/{type_}/result_metric_x3.csv'
+    
+    net_name = ['hybridnet_v5','hybridnet_v5']
+    statistics_metric(input_path,result_path,net_name,['27.0-x3','27.0-x3-maxpool'])
 
 
-    input_path = './result/MLC'
-    result_path = './result/result_auc_x1.csv'
-    net_name = ['resnet18','resnet50','resnest50','efficientnet-b5','se_resnet18', 'se_resnet50', \
-        'hybridnet_v1','swin_transformer','vit_12x12','hybridnet_v3','hybridnet_v3','hybridnet_v3','hybridnet_v4']
+    input_path = f'./result/{type_}'
+    result_path = f'./result/{type_}/result_auc_x3.csv'
+    net_name = ['hybridnet_v5','hybridnet_v5']
     labels_name = [
-        'Shift_png',
-        'Random_png',
-        'Original_png',
-        'Expand_png',
-        'Contract_png'
+        'Shift',
+        'Random',
+        'Original',
+        'Expand',
+        'Contract'
     ]
-    statistics_auc(input_path,result_path,net_name,labels_name,['1.0-x1','3.0-x1',\
-        '5.0-x1','6.0-x1','12.0-x1','13.0-x1','21.0-x3','22.0-x3',\
-        '23.0-x3','25.0-x1','25.0-x3','25.0-x6','26.0-x3'])
+    statistics_auc(input_path,result_path,net_name,labels_name,['27.0-x3','27.0-x3-maxpool'])

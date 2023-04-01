@@ -100,19 +100,19 @@ def cal_mean_std_single(data_path):
 
 if __name__ == '__main__':
 
-    # input_csv = './csv_file/MLC_gamma1mm.csv'
-    # path_list = pd.read_csv(input_csv)['id'].values.tolist()
-    # test_input_csv = './csv_file/MLC_gamma1mm_test.csv'
-    # test_path_list = pd.read_csv(test_input_csv)['id'].values.tolist()
-    # path_list += test_path_list
-    # # cal_mean_std(path_list)
-    # cal_mean_std_single(path_list)
-
-
-    input_csv = './csv_file/MLC_v2.csv'
+    input_csv = './csv_file/MLC_dose_v2.csv'
     path_list = pd.read_csv(input_csv)['id'].values.tolist()
-    test_input_csv = './csv_file/MLC_v2_test.csv'
+    test_input_csv = './csv_file/MLC_dose_v2_test.csv'
     test_path_list = pd.read_csv(test_input_csv)['id'].values.tolist()
     path_list += test_path_list
-    cal_mean_std(path_list)
+    # cal_mean_std(path_list)
+    cal_mean_std_single(path_list)
+
+
+    # input_csv = './csv_file/MLC_v2.csv'
+    # path_list = pd.read_csv(input_csv)['id'].values.tolist()
+    # test_input_csv = './csv_file/MLC_v2_test.csv'
+    # test_path_list = pd.read_csv(test_input_csv)['id'].values.tolist()
+    # path_list += test_path_list
+    # cal_mean_std(path_list)
     # cal_mean_std_single(path_list)

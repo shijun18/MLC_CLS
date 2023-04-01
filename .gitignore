@@ -17,7 +17,7 @@ remove.py
 *.json
 # C extensions
 *.so
-
+insert_csv.py
 # Distribution / packaging
 .Python
 build/
