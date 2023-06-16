@@ -187,7 +187,7 @@ if __name__ == "__main__":
     ###############################################
     elif 'inf' in args.mode:
         add_factor = ADD_FACTOR[TASK]
-        save_dir = './analysis/result/{}/{}'.format(TASK,VERSION)
+        save_dir = './analysis/tmp_result/{}/{}'.format(TASK,VERSION)
         test_csv = TEST_DATA[TASK]
         df = pd.read_csv(test_csv)
         test_path = df['id'].values.tolist()

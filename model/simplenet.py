@@ -272,9 +272,9 @@ class SimpleNet(nn.Module):
         self.out_feature = num_fea[depth-1] * block.expansion
 
         # save for load imagenet pre-trained weight
-        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        self.drop = nn.Dropout(final_drop) if final_drop > 0.0 else None
-        self.fc = nn.Linear(512 * block.expansion, 1000)
+        # self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+        # self.drop = nn.Dropout(final_drop) if final_drop > 0.0 else None
+        # self.fc = nn.Linear(512 * block.expansion, 1000)
         
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -324,6 +324,7 @@ class SimpleNet(nn.Module):
         out_x.append(x)
         for layer in self.layers:
             x = layer(x)
+            print(x.size())
             out_x.append(x)
 
         return out_x
@@ -372,10 +373,10 @@ def se_simplenet50(pretrained=False, progress=True, **kwargs):
 
 if __name__ == "__main__":
   
-  net = simplenet18(depth=3,input_channels=1,num_classes=2)
+  net = se_simplenet50(depth=2,input_channels=1,num_classes=2)
 
   from torchsummary import summary
   import os 
   os.environ['CUDA_VISIBLE_DEVICES'] = '2'
   net = net.cuda()
-  summary(net,input_size=(1,512,512),batch_size=1,device='cuda')
+  summary(net,input_size=(1,224,224),batch_size=1,device='cuda')

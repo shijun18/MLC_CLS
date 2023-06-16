@@ -4,7 +4,7 @@ __all__ = ['resnet18','resnet34', 'resnet50','resnest18','resnest50',\
             'densenet169','se_resnet18', 'se_resnet50','regnetx-200MF','regnety-8.0GF',\
             'regnety-16GF','res2next50','regnetx-600MF','regnety-600MF','regnety-4.0GF',\
             'hybridnet_v1','swin_transformer','vit_12x12','hybridnet_v2','hybridnet_v3',\
-            'hybridnet_v4','hybridnet_v5']
+            'hybridnet_v4','hybridnet_v5','mpnet_12x32','hybridnet_v6','mpnet_swin_12x32']
 
 
 data_config = {
@@ -25,8 +25,8 @@ num_classes = {
 
 TASK = 'MLC_Dose'
 NET_NAME = 'hybridnet_v5' #regnetx-200MF
-VERSION = 'v27.0-x3-maxpool' 
-DEVICE = '0'
+VERSION = 'v27.0-x3' 
+DEVICE = '1'
 # Must be True when pre-training and inference
 PRE_TRAINED = True	
 # 1,2,3,4,5
@@ -34,6 +34,7 @@ CURRENT_FOLD = 1
 GPU_NUM = len(DEVICE.split(','))
 FOLD_NUM = 5
 TTA_TIMES = 11
+
 
 
 NUM_CLASSES = num_classes[TASK]
@@ -51,7 +52,9 @@ if PRE_TRAINED:
 else:
     WEIGHT_PATH_LIST = None
 
-# WEIGHT_PATH_LIST = None
+# WEIGHT_PATH_LIST =
+# 
+#  None
 
 MEAN = {
     'MLC_v2':[0.493,0.495,0.501],
@@ -133,7 +136,7 @@ INIT_TRAINER = {
     'use_fp16':True,
     'transform':TRANSFORM[TASK],
     'drop_rate': 0.5, #0.5
-    'smothing':0.15,
+    'smoothing':0.15,
     'external_pretrained':True if 'pretrained' in VERSION else False,#False
     'use_mixup':True if 'mixup' in VERSION else False,
     'use_cutmix':True if 'cutmix' in VERSION else False,

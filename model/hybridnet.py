@@ -1,6 +1,5 @@
 import sys
 sys.path.append("..")
-import torch
 import torch.nn as nn
 # from . import simplenet as simplenet
 # from . import vit as vit
@@ -88,10 +87,16 @@ def hybridnet_v5(**kwargs):
                     **kwargs)
     return net
 
+def hybridnet_v6(**kwargs):
+    net = HybridNet(cnn_net='se_simplenet50',
+                    trans_net='vit_12x12',
+                    out_index=2,
+                    **kwargs)
+    return net
 
 if __name__ == "__main__":
   
-  net = hybridnet_v1(img_size=(224,224),
+  net = hybridnet_v5(img_size=(224,224),
                     input_channels=3,
                     num_classes=5
                     )

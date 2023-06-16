@@ -1,11 +1,18 @@
+import sys
+sys.path.append("..")
 import torch
 from torch import nn
 from torch.nn import functional as F
 from einops.layers.torch import Rearrange
 from einops import rearrange
 
+import model.simplenet as simplenet
+from model.swin_transformer import SwinTransformerBlock
+import math
+
 def pair(t):
     return t if isinstance(t, tuple) else (t, t)
+
 
 class PreNorm(nn.Module):
     def __init__(self, dim, fn):
@@ -15,20 +22,8 @@ class PreNorm(nn.Module):
     def forward(self, x, **kwargs):
         return self.fn(self.norm(x), **kwargs)
 
-class FeedForward(nn.Module):
-    def __init__(self, dim, hidden_dim, dropout = 0.):
-        super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(dim, hidden_dim),
-            nn.GELU(),
-            nn.Dropout(dropout),
-            nn.Linear(hidden_dim, dim),
-            nn.Dropout(dropout)
-        )
-    def forward(self, x):
-        return self.net(x)
 
-class DenseForward(nn.Module):
+class FeedForward(nn.Module):
     def __init__(self, dim, hidden_dim, outdim, dropout=0.):
         super().__init__()
         self.net = nn.Sequential(
@@ -42,64 +37,92 @@ class DenseForward(nn.Module):
         return self.net(x)
 
 
-class Dense_Attention(nn.Module):
-    def __init__(self, dim, heads=8, dim_head=64, dropout=0., num_patches=None):
+class TransformerBlock(nn.Module):
+    def __init__(self, dim, heads=8,  dropout=0.):
         super().__init__()
-        inner_dim = dim_head *  heads
-        project_out = not (heads == 1 and dim_head == dim)
+        project_out = not (heads == 1)
 
         self.heads = heads
-        self.scale = dim_head ** -0.5
+        self.scale = (dim//heads) ** -0.5
 
-        self.attend = nn.Softmax(dim = -1)
-        self.to_qkv = nn.Linear(dim, inner_dim * 3, bias = False)
-
+        self.to_qkv = nn.Linear(dim, dim * 3, bias = False)
         self.to_out = nn.Sequential(
-            nn.Linear(inner_dim, dim),
+            nn.Linear(dim, dim),
             nn.Dropout(dropout)
         ) if project_out else nn.Identity()
 
     def forward(self, x):
-        # x = torch.cat(x, 2)
         qkv = self.to_qkv(x).chunk(3, dim = -1)
         q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> b h n d', h = self.heads), qkv)
-
         dots = torch.matmul(q, k.transpose(-1, -2)) * self.scale
-
-        attn = self.attend(dots)
-
+        attn = F.softmax(dots,dim=-1)
         out = torch.matmul(attn, v)
         out = rearrange(out, 'b h n d -> b n (h d)')
         return self.to_out(out)
 
 
-class DensePreConv_AttentionBlock(nn.Module):
-    def __init__(self, out_channels, height, width, growth_rate=32,  depth=4, heads=8,  dropout=0.5, attention=Dense_Attention):
+class SwinDenseTransformerBlock(nn.Module):
+    def __init__(self, out_channels, growth_rate=32,  depth=4, heads=4,  dropout=0.5, input_h=None, input_w=None, Attention=SwinTransformerBlock):
         super().__init__()
         mlp_dim = growth_rate * 2
+        cat_dim = out_channels + depth * growth_rate
         self.layers = nn.ModuleList([])
         for i in range(depth):
             self.layers.append(nn.ModuleList([
                 nn.Linear(out_channels + i * growth_rate, growth_rate),
-                PreNorm(growth_rate, attention(growth_rate, heads = heads, dim_head = (growth_rate) // heads, dropout = dropout, num_patches=(height,width))),
-                PreNorm(growth_rate, DenseForward(growth_rate, mlp_dim,growth_rate, dropout = dropout))
+                PreNorm(growth_rate, 
+                        Attention(dim=growth_rate, 
+                                  num_heads=heads, 
+                                  drop=dropout, 
+                                  input_resolution=(input_h,input_w),
+                                  window_size=7,
+                                  shift_size=0 if (i % 2 == 0) else 7 // 2)
+                ),
             ]))
-        self.out_layer = DenseForward(out_channels + depth * growth_rate, mlp_dim,out_channels, dropout = dropout)
+        self.out_layer = FeedForward(dim=cat_dim, hidden_dim=mlp_dim, outdim=out_channels, dropout=dropout)
             
     def forward(self, x):
         features = [x]
-        for l, attn, ff in self.layers:
+        for liner, attn in self.layers:
             x = torch.cat(features, 2)
-            x = l(x)
-            x = attn(x) + x
-            x = ff(x) + x
-            features.append(ff(x))
+            x = liner(x)
+            x = attn(x)
+            features.append(x)
         x = torch.cat(features, 2)
         x = self.out_layer(x)
         return x
 
-class Dense_TransformerBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, image_size, growth_rate=32, patch_size=16, depth=6, heads=8, dropout=0.5, attention=DensePreConv_AttentionBlock):
+
+class DenseTransformerBlock(nn.Module):
+    def __init__(self, out_channels, growth_rate=32,  depth=4, heads=8,  dropout=0.5, input_h=None, input_w=None, Attention=TransformerBlock):
+        super().__init__()
+        mlp_dim = growth_rate * 2
+        cat_dim = out_channels + depth * growth_rate
+        self.layers = nn.ModuleList([])
+        for i in range(depth):
+            self.layers.append(nn.ModuleList([
+                nn.Linear(out_channels + i * growth_rate, growth_rate),
+                PreNorm(growth_rate, Attention(dim=growth_rate, heads=heads, dropout=dropout)),
+                PreNorm(growth_rate, FeedForward(dim=growth_rate, hidden_dim=mlp_dim, outdim=growth_rate, dropout=dropout))
+            ]))
+        self.out_layer = FeedForward(dim=cat_dim, hidden_dim=mlp_dim, outdim=out_channels, dropout=dropout)
+            
+    def forward(self, x):
+        features = [x]
+        for liner, attn, ff in self.layers:
+            x = torch.cat(features, 2)
+            x = liner(x)
+            x = attn(x) + x
+            # x = ff(x) + x
+            x = ff(x)
+            features.append(x)
+        x = torch.cat(features, 2)
+        x = self.out_layer(x)
+        return x
+
+
+class MultiPathAttention(nn.Module):
+    def __init__(self, in_channels, out_channels, image_size, growth_rate=32, patch_size=16, depth=6, dropout=0.5, attention=DenseTransformerBlock):
         super().__init__()
         image_height, image_width = pair(image_size)
         patch_height, patch_width = pair(patch_size)
@@ -108,149 +131,201 @@ class Dense_TransformerBlock(nn.Module):
         h = image_height // patch_height
         w = image_width // patch_width
         num_patches = (image_height // patch_height) * (image_width // patch_width)
-        mlp_dim = out_channels * 2
+       
         self.patch_embeddings = nn.Conv2d(in_channels=in_channels,
                                        out_channels=out_channels,
                                        kernel_size=patch_size,
                                        stride=patch_size)
         self.position_embeddings = nn.Parameter(torch.zeros(1, num_patches, out_channels))
+        self.trunc_normal_(self.position_embeddings, mean=0.0, std=0.02, a=-2.0, b=2.0)
+        self.norm = nn.LayerNorm(out_channels)
+        blocks = []
+        for _ in range(depth):
+            blocks.append(
+                attention(out_channels, growth_rate=growth_rate, input_h=h, input_w=w)
+            )
+        self.blocks = nn.ModuleList(blocks)
 
-        self.blocks = nn.ModuleList([])
-        for i in range(depth):
-            self.blocks.append(nn.ModuleList([
-                attention(out_channels, height=h, width=w, growth_rate=growth_rate)
-            ]))
-        
-        self.re_patch_embedding = nn.Sequential(
-            Rearrange('b (h w) (p1 p2 c) -> b c (h p1) (w p2)', p1 = 1, p2 = 1, h = h)
+        self.reshape = nn.Sequential(
+            Rearrange('b (h w) c -> b c h w ', h=h,w=w)
         )
         self.dropout = nn.Dropout(dropout)
+        self.apply(self._init_weights)
+
+    def _init_weights(self, m):
+        if isinstance(m, nn.Linear):
+            self.trunc_normal_(m.weight, mean=0.0, std=0.02, a=-2.0, b=2.0)
+            if isinstance(m, nn.Linear) and m.bias is not None:
+                nn.init.constant_(m.bias, 0)
+        elif isinstance(m, nn.LayerNorm):
+            nn.init.constant_(m.bias, 0)
+            nn.init.constant_(m.weight, 1.0)
+
+    def trunc_normal_(self, tensor, mean, std, a, b):
+        # From PyTorch official master until it's in a few official releases - RW
+        # Method based on https://people.sc.fsu.edu/~jburkardt/presentations/truncated_normal.pdf
+        def norm_cdf(x):
+            return (1.0 + math.erf(x / math.sqrt(2.0))) / 2.0
+
+        with torch.no_grad():
+            l = norm_cdf((a - mean) / std)
+            u = norm_cdf((b - mean) / std)
+            tensor.uniform_(2 * l - 1, 2 * u - 1)
+            tensor.erfinv_()
+            tensor.mul_(std * math.sqrt(2.0))
+            tensor.add_(mean)
+            tensor.clamp_(min=a, max=b)
+            return tensor
         
     def forward(self, img):
-        x = self.patch_embeddings(img)  # (B, hidden. n_patches^(1/2), n_patches^(1/2))
+        x = self.patch_embeddings(img)  # (B, hidden, num_patches^(1/2), num_patches^(1/2))
+        # print(x.size())
         x = x.flatten(2)
-        x = x.transpose(-1, -2)  # (B, n_patches, hidden)
+        x = x.transpose(-1, -2)  # (B, num_patches, hidden)
+        x = self.norm(x)
         embeddings = x + self.position_embeddings
         x = self.dropout(embeddings)
 
-        for block, in self.blocks:
-            # print(block)
+        for block in self.blocks:
             x = block(x)
         
-        x = self.re_patch_embedding(x)
+        x = self.reshape(x)
         return F.interpolate(x, self.outsize)
 
 
-class BasicConv2d(nn.Module):
-    def __init__(self, in_channels, out_channels, **kwargs):
-        super(BasicConv2d, self).__init__()
-        self.conv = nn.Conv2d(in_channels, out_channels, bias=False, **kwargs)
-        self.norm = nn.InstanceNorm2d(out_channels, affine=True)
 
-    def forward(self, x):
-        x = self.conv(x)
-        x = self.norm(x)
-        x = F.relu(x, inplace=True)
-        return x
-
-class UpConv(nn.Module):
-    def __init__(self, in_channels, out_channels, scale=2):
-        super().__init__()
-        self.scale = scale
-        self.double_conv = nn.Sequential(
-            nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1),
-            nn.InstanceNorm2d(out_channels),
-            nn.ReLU(inplace=True)
+class SELayer(nn.Module):
+    def __init__(self, channel, reduction=16):
+        super(SELayer, self).__init__()
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.fc = nn.Sequential(
+            nn.Linear(channel, channel // reduction, bias=False),
+            nn.ReLU(inplace=True),
+            nn.Linear(channel // reduction, channel, bias=False),
+            nn.Sigmoid()
         )
 
     def forward(self, x):
-        x = self.double_conv(x)
-        x = F.interpolate(x, scale_factor=self.scale, mode='bilinear', align_corners=False)
-        return x
+        b, c, _, _ = x.size()
+        y = self.avg_pool(x).view(b, c)
+        y = self.fc(y).view(b, c, 1, 1)
+        return x * y.expand_as(x)
 
 
-class HDenseFormer_2D(nn.Module):
-    def __init__(self, in_channels, n_cls, n_filters, image_size=(384,384), transformer_depth=12):
-        super(HDenseFormer_2D, self).__init__()
-        self.in_channels = in_channels
-        self.n_cls = n_cls
-        self.n_filters = n_filters
+class SEBasicBlock(nn.Module):
 
-        self.attns = nn.ModuleList(
-            [Dense_TransformerBlock(in_channels=1,out_channels=4 * n_filters,image_size=image_size,
-            patch_size=16,depth=transformer_depth//4,attention=DensePreConv_AttentionBlock) for _ in range(self.in_channels)] 
+    def __init__(self, inplanes, planes, stride=1, downsample=None, reduction=16):
+        super(SEBasicBlock, self).__init__()
+        self.conv1 = nn.Conv2d(inplanes, planes, kernel_size=3, stride=stride, padding=1)
+        self.bn1 = nn.BatchNorm2d(planes)
+        self.relu = nn.ReLU(inplace=True)
+        self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=stride, padding=1)
+        self.bn2 = nn.BatchNorm2d(planes)
+        self.se = SELayer(planes, reduction)
+        
+        if inplanes != planes:
+            self.downsample = nn.Sequential(
+                nn.Conv2d(inplanes, planes, kernel_size=1, stride=1),
+                nn.BatchNorm2d(planes)
             )
-
-        # self.deep_conv = BasicConv2d(4 * n_filters * 3, 8 * n_filters, kernel_size=3, stride=1, padding=1)
-        self.deep_conv = UpConv(4 * n_filters * self.in_channels, 8 * n_filters)
-
-        self.up1 = UpConv(8 * n_filters,4 * n_filters)
-        self.up2 = UpConv(4 * n_filters,2 * n_filters)
-        self.up3 = UpConv(2 * n_filters,1 * n_filters)
-
-        self.block_1_1_left = BasicConv2d(in_channels, n_filters, kernel_size=3, stride=1, padding=1)
-        self.block_1_2_left = BasicConv2d(n_filters, n_filters, kernel_size=3, stride=1, padding=1)
-
-        self.pool_1 = nn.MaxPool2d(kernel_size=2, stride=2)  # 64, 1/2
-        self.block_2_1_left = BasicConv2d(n_filters, 2 * n_filters, kernel_size=3, stride=1, padding=1)
-        self.block_2_2_left = BasicConv2d(2 * n_filters, 2 * n_filters, kernel_size=3, stride=1, padding=1)
-
-        self.pool_2 = nn.MaxPool2d(kernel_size=2, stride=2)  # 128, 1/4
-        self.block_3_1_left = BasicConv2d(2 * n_filters, 4 * n_filters, kernel_size=3, stride=1, padding=1)
-        self.block_3_2_left = BasicConv2d(4 * n_filters, 4 * n_filters, kernel_size=3, stride=1, padding=1)
-
-        self.pool_3 = nn.MaxPool2d(kernel_size=2, stride=2)  # 256, 1/8
-        self.block_4_1_left = BasicConv2d(4 * n_filters, 8 * n_filters, kernel_size=3, stride=1, padding=1)
-        self.block_4_2_left = BasicConv2d(8 * n_filters, 8 * n_filters, kernel_size=3, stride=1, padding=1)
-
-        self.upconv_3 = nn.ConvTranspose2d(8 * n_filters, 4 * n_filters, kernel_size=3, stride=2, padding=1, output_padding=1)
-        self.block_3_1_right = BasicConv2d((4 + 4) * n_filters, 4 * n_filters, kernel_size=3, stride=1, padding=1)
-        self.block_3_2_right = BasicConv2d(4 * n_filters, 4 * n_filters, kernel_size=3, stride=1, padding=1)
-
-        self.upconv_2 = nn.ConvTranspose2d(4 * n_filters, 2 * n_filters, kernel_size=3, stride=2, padding=1, output_padding=1)
-        self.block_2_1_right = BasicConv2d((2 + 2) * n_filters, 2 * n_filters, kernel_size=3, stride=1, padding=1)
-        self.block_2_2_right = BasicConv2d(2 * n_filters, 2 * n_filters, kernel_size=3, stride=1, padding=1)
-
-        self.upconv_1 = nn.ConvTranspose2d(2 * n_filters, n_filters, kernel_size=3, stride=2, padding=1, output_padding=1)
-        self.block_1_1_right = BasicConv2d((1 + 1) * n_filters, n_filters, kernel_size=3, stride=1, padding=1)
-        self.block_1_2_right = BasicConv2d(n_filters, n_filters, kernel_size=3, stride=1, padding=1)
-
-        self.conv1x1 = nn.Conv2d(n_filters, self.n_cls, kernel_size=1, stride=1, padding=0)
-
-        self.conv1x1_d1 = nn.Conv2d(2 * n_filters, self.n_cls, kernel_size=1, stride=1, padding=0)
-        self.conv1x1_d2 = nn.Conv2d(4 * n_filters, self.n_cls, kernel_size=1, stride=1, padding=0)
-        self.conv1x1_d3 = nn.Conv2d(8 * n_filters, self.n_cls, kernel_size=1, stride=1, padding=0)
+        else:
+            self.downsample = None
 
     def forward(self, x):
-        attnall = torch.cat([self.attns[i](x[:,i:i+1,:,:]) for i in range(self.in_channels)],1)
-        attnout = self.deep_conv(attnall)  # 256, 1/8
+        residual = x
+        out = self.conv1(x)
+        out = self.bn1(out)
+        out = self.relu(out)
 
-        at1 = self.up1(attnout)   # 128, 1/4
-        at2 = self.up2(at1)  # 64, 1/2
-        at3 = self.up3(at2)
+        out = self.conv2(out)
+        out = self.bn2(out)
+        out = self.se(out)
 
-        ds0 = self.block_1_2_left(self.block_1_1_left(x))
-        ds0 = ds0+at3
-        ds1 = self.block_2_2_left(self.block_2_1_left(self.pool_1(ds0)))
-        ds1 = ds1+at2
-        ds2 = self.block_3_2_left(self.block_3_1_left(self.pool_2(ds1)))
-        ds2 = ds2+at1
-        x = self.block_4_2_left(self.block_4_1_left(self.pool_3(ds2)))
-        x = x+attnout
+        if self.downsample is not None:
+            residual = self.downsample(x)
 
-        out3 = self.conv1x1_d3(x)
-        x = self.block_3_2_right(self.block_3_1_right(torch.cat([self.upconv_3(x), ds2], 1)))
-        out2 = self.conv1x1_d2(x)
-        x = self.block_2_2_right(self.block_2_1_right(torch.cat([self.upconv_2(x), ds1], 1)))
-        out1 = self.conv1x1_d1(x)
-        x = self.block_1_2_right(self.block_1_1_right(torch.cat([self.upconv_1(x), ds0], 1)))
+        out += residual
+        out = self.relu(out)
 
-        x = self.conv1x1(x)
+        return out
+
+
+
+class MultiPathNet(nn.Module):
+    def __init__(self, in_channels=3, cnn_net='se_simplenet50', num_classes=5, n_filters=32, 
+                 image_size=(224,224), transformer_depth=12, patch_size=8, drop_rate=0.,attention=DenseTransformerBlock):
+        super(MultiPathNet, self).__init__()
+        self.in_channels = in_channels
+        self.num_classes = num_classes
+        self.transformer_depth = transformer_depth
+        self.n_filters = n_filters
+
+        self.cnn_backbone = nn.ModuleList([simplenet.__dict__[cnn_net](depth=2,input_channels=1) for _ in range(self.in_channels)])
+        self.cnn_out_feature = self.cnn_backbone[0].out_feature
+        # print(self.cnn_out_feature)
+        self.multi_attn = nn.ModuleList(
+                [MultiPathAttention(in_channels=self.cnn_out_feature,
+                                    out_channels=4*self.n_filters,
+                                    image_size=image_size//4,
+                                    patch_size=patch_size,
+                                    depth=self.transformer_depth//4,
+                                    attention=attention) for _ in range(self.in_channels)] 
+            )
+
         
-        return [x,out1,out2,out3]
+        
+        cat_dim = 4 * n_filters * self.in_channels
+        
+        self.cls = nn.Sequential(
+            SEBasicBlock(cat_dim,  4*n_filters, stride=1),
+            SEBasicBlock(4*n_filters, n_filters, stride=1)
+        )
+        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+        self.drop = nn.Dropout(drop_rate) if drop_rate > 0.0 else None
+        self.fc = nn.Linear(n_filters, self.num_classes)
 
-def HDenseFormer_2D_32(in_channels, n_cls, image_size, transformer_depth):
-    return HDenseFormer_2D(in_channels=in_channels, n_cls=n_cls, image_size=image_size,n_filters=32, transformer_depth=transformer_depth)
 
-def HDenseFormer_2D_16(in_channels, n_cls, image_size, transformer_depth):
-    return HDenseFormer_2D(in_channels=in_channels, n_cls=n_cls, image_size=image_size, n_filters=16,transformer_depth=transformer_depth)
+    def forward(self, x):
+        attnall = []
+        for i in range(self.in_channels):
+            conv_out = self.cnn_backbone[i](x[:,i:i+1,:,:])
+            att_out = self.multi_attn[i](conv_out[-1])
+            attnall.append(att_out)
+        attnall= torch.cat(attnall,1)
+        x = self.cls(attnall)
+        x = self.avgpool(x)
+        x = torch.flatten(x, 1)
+        if self.drop:
+            x = self.drop(x)
+        x = self.fc(x)
+        
+        return x
+
+def mpnet_12x32(in_channels, num_classes, image_size):
+    return MultiPathNet(in_channels=in_channels, 
+                        num_classes=num_classes, 
+                        image_size=image_size, 
+                        n_filters=32, 
+                        transformer_depth=12,
+                        attention=DenseTransformerBlock)
+
+
+
+def mpnet_swin_12x32(in_channels, num_classes, image_size):
+    return MultiPathNet(in_channels=in_channels, 
+                        num_classes=num_classes, 
+                        image_size=image_size, 
+                        n_filters=32, 
+                        transformer_depth=12,
+                        attention=SwinDenseTransformerBlock)
+
+
+if __name__ == "__main__":
+  
+  net = mpnet_swin_12x32(in_channels=3,num_classes=5,image_size=224)
+
+  from torchsummary import summary
+  import os 
+  os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+  net = net.cuda()
+  summary(net,input_size=(3,224,224),batch_size=1,device='cuda')

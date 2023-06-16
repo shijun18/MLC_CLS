@@ -59,7 +59,7 @@ class My_Classifier(object):
     def __init__(self, net_name=None, gamma=0.1, lr=1e-3, n_epoch=1, channels=1, num_classes=3, input_shape=None, crop=48,
                  batch_size=6, num_workers=0, device=None, pre_trained=False, weight_path=None, weight_decay=0.,
                  momentum=0.95, mean=(0.105393,), std=(0.203002,), milestones=None,use_fp16=False,transform=None,
-                 drop_rate=0.0,smothing=0.1,external_pretrained=False,use_mixup=False,use_cutmix=False,mix_only=False,use_maxpool=False):
+                 drop_rate=0.0,smoothing=0.1,external_pretrained=False,use_mixup=False,use_cutmix=False,mix_only=False,use_maxpool=False):
         super(My_Classifier, self).__init__()
 
         self.net_name = net_name
@@ -91,7 +91,7 @@ class My_Classifier(object):
         self.milestones = milestones
         self.use_fp16 = use_fp16
         self.drop_rate = drop_rate
-        self.smothing = smothing
+        self.smoothing = smoothing
         self.external_pretrained = external_pretrained
         self.use_mixup = use_mixup
         self.use_cutmix = use_cutmix
@@ -167,8 +167,6 @@ class My_Classifier(object):
         net = self.net
         lr = self.lr
         loss = self._get_loss(loss_fun, class_weight)
-        weight_decay = self.weight_decay
-        momentum = self.momentum
 
         if len(self.device.split(',')) > 1:
             net = DataParallel(net)
@@ -197,7 +195,7 @@ class My_Classifier(object):
         loss = loss.cuda()
 
         # optimizer setting
-        optimizer = self._get_optimizer(optimizer, net, lr, weight_decay, momentum)
+        optimizer = self._get_optimizer(optimizer, net, lr)
         scaler = GradScaler()
 
         # if self.pre_trained:
@@ -586,13 +584,6 @@ class My_Classifier(object):
             import model.densenet as densenet
             net = densenet.__dict__[net_name](pretrained=self.external_pretrained,input_channels=self.channels,
                                             num_classes=self.num_classes,drop_rate=self.drop_rate)
-        elif net_name.startswith('vgg'):
-            import model.vgg as vgg
-            net = vgg.__dict__[net_name](pretrained=self.external_pretrained,input_channels=self.channels,num_classes=self.num_classes)
-        
-        elif net_name.startswith('mod_vgg'):
-            import model.vgg_mod as mod_vgg
-            net = mod_vgg.__dict__[net_name](input_channels=self.channels,num_classes=self.num_classes,final_drop=self.drop_rate)
         
         elif net_name.startswith('res2net'):
             import model.res2net as res2net
@@ -605,6 +596,14 @@ class My_Classifier(object):
                             num_classes=self.num_classes)
             if self.use_maxpool:
                 net.trans_net.avgpool = nn.AdaptiveMaxPool1d(1)
+        
+        elif net_name.startswith('mpnet'):
+            import model.mpnet as mpnet
+            net = mpnet.__dict__[net_name](image_size=self.input_shape[0],in_channels=self.channels,
+                            num_classes=self.num_classes)
+            if self.use_maxpool:
+                net.trans_net.avgpool = nn.AdaptiveMaxPool1d(1)
+
         elif net_name.startswith('vit'):
             import model.vit as vit
             net = vit.__dict__[net_name](img_size=self.input_shape,in_channels=self.channels,
@@ -668,7 +667,7 @@ class My_Classifier(object):
 
         elif loss_fun == 'SoftCrossEntropy':
             from losses.crossentropy import SoftCrossEntropy
-            loss = SoftCrossEntropy(classes=self.num_classes,smoothing=self.smothing,weight=class_weight)
+            loss = SoftCrossEntropy(classes=self.num_classes,smoothing=self.smoothing,weight=class_weight)
 
         elif loss_fun == 'TopkCrossEntropy':
             from losses.crossentropy import SoftCrossEntropy
@@ -676,7 +675,7 @@ class My_Classifier(object):
 
         elif loss_fun == 'TopkSoftCrossEntropy':
             from losses.crossentropy import SoftCrossEntropy
-            loss = SoftCrossEntropy(classes=self.num_classes,smoothing=self.smothing,weight=class_weight,reduction='topk',k=0.8)
+            loss = SoftCrossEntropy(classes=self.num_classes,smoothing=self.smoothing,weight=class_weight,reduction='topk',k=0.8)
 
         elif loss_fun == 'DynamicTopkCrossEntropy':
             from losses.crossentropy import DynamicTopkSoftCrossEntropy
@@ -684,7 +683,7 @@ class My_Classifier(object):
 
         elif loss_fun == 'DynamicTopkSoftCrossEntropy':
             from losses.crossentropy import DynamicTopkSoftCrossEntropy
-            loss = DynamicTopkSoftCrossEntropy(classes=self.num_classes,smoothing=self.smothing,weight=class_weight)
+            loss = DynamicTopkSoftCrossEntropy(classes=self.num_classes,smoothing=self.smoothing,weight=class_weight)
         
         elif loss_fun == 'F1_Loss':
             from losses.f1_loss import F1_Loss
@@ -692,19 +691,70 @@ class My_Classifier(object):
         
         return loss
 
-    def _get_optimizer(self, optimizer, net, lr, weight_decay, momentum):
-        if optimizer == 'Adam':
-            optimizer = torch.optim.Adam(
-                net.parameters(), lr=lr, weight_decay=weight_decay)
+    # def _get_optimizer(self, optimizer, net, lr, weight_decay, momentum):
+    #     if optimizer == 'Adam':
+    #         optimizer = torch.optim.Adam(
+    #             net.parameters(), lr=lr, weight_decay=weight_decay)
 
-        elif optimizer == 'SGD':
-            optimizer = torch.optim.SGD(
-                net.parameters(), lr=lr, momentum=momentum, weight_decay=weight_decay)
+    #     elif optimizer == 'SGD':
+    #         optimizer = torch.optim.SGD(
+    #             net.parameters(), lr=lr, momentum=momentum, weight_decay=weight_decay)
         
-        elif optimizer == 'AdamW':
-            optimizer = torch.optim.AdamW(net.parameters(), lr=lr,weight_decay=weight_decay, amsgrad=False)
+    #     elif optimizer == 'AdamW':
+    #         optimizer = torch.optim.AdamW(net.parameters(), lr=lr,weight_decay=weight_decay, amsgrad=False)
+    #     return optimizer
+
+
+    def _get_optimizer(self, optimizer, net, lr):
+        """
+        Build optimizer, set weight decay of normalization to 0 by default.
+        """
+        def check_keywords_in_name(name, keywords=()):
+            isin = False
+            for keyword in keywords:
+                if keyword in name:
+                    isin = True
+            return isin
+
+        def set_weight_decay(model, skip_list=(), skip_keywords=()):
+            has_decay = []
+            no_decay = []
+
+            for name, param in model.named_parameters():
+                # check what will happen if we do not set no_weight_decay
+                if not param.requires_grad:
+                    continue  # frozen weights
+                if len(param.shape) == 1 or name.endswith(".bias") or (name in skip_list) or \
+                        check_keywords_in_name(name, skip_keywords):
+                    no_decay.append(param)
+                    # print(f"{name} has no weight decay")
+                else:
+                    has_decay.append(param)
+            return [{'params': has_decay},
+                    {'params': no_decay, 'weight_decay': 0.}]
+
+        skip = {}
+        skip_keywords = {}
+        if hasattr(net, 'no_weight_decay'):
+            skip = net.no_weight_decay()
+        if hasattr(net, 'no_weight_decay_keywords'):
+            skip_keywords = net.no_weight_decay_keywords()
+        parameters = set_weight_decay(net, skip, skip_keywords)
+
+        opt_lower = optimizer.lower()
+        optimizer = None
+        if opt_lower == 'sgd':
+            optimizer = torch.optim.SGD(parameters, momentum=self.momentum, nesterov=True,
+                                lr=lr, weight_decay=self.weight_decay)
+        elif opt_lower == 'adamw':
+            optimizer = torch.optim.AdamW(parameters, eps=1e-8, betas=(0.9, 0.999),
+                                    lr=lr, weight_decay=self.weight_decay)
+        elif opt_lower == 'adam':
+            optimizer = torch.optim.Adam(parameters, lr=lr, weight_decay=self.weight_decay)
+
         return optimizer
 
+    
     def _get_lr_scheduler(self, lr_scheduler, optimizer):
         if lr_scheduler == 'ReduceLROnPlateau':
             lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,
@@ -729,10 +779,11 @@ class My_Classifier(object):
         return lr_scheduler
 
     def _get_pre_trained(self, weight_path):
-        checkpoint = torch.load(weight_path)
-        self.net.load_state_dict(checkpoint['state_dict'])
+        checkpoint = torch.load(weight_path,map_location='cpu')
+        # self.net.load_state_dict(checkpoint['state_dict'])
         # self.start_epoch = checkpoint['epoch'] + 1
-
+        msg=self.net.load_state_dict(checkpoint['state_dict'],strict=False)
+        print(msg)
 
 # computing tools
 
